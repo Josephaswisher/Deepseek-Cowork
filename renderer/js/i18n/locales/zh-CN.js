@@ -26,6 +26,7 @@
       back: '返回',
       next: '下一步',
       previous: '上一步',
+      skip: '跳过',
       start: '启动',
       stop: '停止',
       restart: '重启',
@@ -401,7 +402,8 @@
       step1: '环境检测',
       step2: '安装依赖',
       step3: 'API 配置',
-      step4: '完成',
+      step4: '浏览器扩展',
+      step5: '完成',
       
       // 第一步
       envCheckTitle: '环境检测结果',
@@ -428,7 +430,20 @@
       modelNameLabel: '模型名称',
       saveConfig: '保存配置',
       
-      // 第四步
+      // 第四步 - JS-EYES 浏览器扩展
+      installJsEyesTitle: '安装 JS-EYES 浏览器扩展',
+      installJsEyesDesc: 'JS-EYES 用于浏览器自动化功能（可选）',
+      jsEyesOptionalHint: '此步骤为可选，您可以跳过',
+      jsEyesFeatures: '功能：控制标签页、执行脚本、提取数据',
+      jsEyesInstallSteps: '安装步骤',
+      jsEyesStep1: '从 GitHub 下载项目',
+      jsEyesStep2: '打开 Chrome 扩展管理页面 (chrome://extensions)',
+      jsEyesStep3: '开启开发者模式',
+      jsEyesStep4: '点击"加载已解压的扩展程序"',
+      jsEyesStep5: '选择下载的 js-eyes 目录',
+      openGithub: '打开 GitHub',
+      
+      // 第五步
       completeTitle: '配置完成',
       completeDesc: '您已完成所有必要配置，可以开始使用了',
       startUsingBtn: '开始使用'

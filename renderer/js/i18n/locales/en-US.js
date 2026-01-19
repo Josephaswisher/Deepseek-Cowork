@@ -26,6 +26,7 @@
       back: 'Back',
       next: 'Next',
       previous: 'Previous',
+      skip: 'Skip',
       start: 'Start',
       stop: 'Stop',
       restart: 'Restart',
@@ -401,7 +402,8 @@
       step1: 'Environment Check',
       step2: 'Install Dependencies',
       step3: 'API Configuration',
-      step4: 'Complete',
+      step4: 'Browser Extension',
+      step5: 'Complete',
       
       // Step 1
       envCheckTitle: 'Environment Check Results',
@@ -428,7 +430,20 @@
       modelNameLabel: 'Model Name',
       saveConfig: 'Save Configuration',
       
-      // Step 4
+      // Step 4 - JS-EYES Browser Extension
+      installJsEyesTitle: 'Install JS-EYES Browser Extension',
+      installJsEyesDesc: 'JS-EYES enables browser automation features (optional)',
+      jsEyesOptionalHint: 'This step is optional, you can skip it',
+      jsEyesFeatures: 'Features: Tab control, script execution, data extraction',
+      jsEyesInstallSteps: 'Installation Steps',
+      jsEyesStep1: 'Download the project from GitHub',
+      jsEyesStep2: 'Open Chrome extensions page (chrome://extensions)',
+      jsEyesStep3: 'Enable Developer Mode',
+      jsEyesStep4: 'Click "Load unpacked"',
+      jsEyesStep5: 'Select the downloaded js-eyes directory',
+      openGithub: 'Open GitHub',
+      
+      // Step 5
       completeTitle: 'Configuration Complete',
       completeDesc: 'You have completed all necessary configurations and can start using',
       startUsingBtn: 'Start Using'

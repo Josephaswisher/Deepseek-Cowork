@@ -17,7 +17,7 @@ class SetupWizard {
     
     // 当前步骤
     this.currentWizardStep = 1;
-    this.totalSteps = 4;
+    this.totalSteps = 5;
     
     // 需求检查状态
     this.wizardRequirements = null;
@@ -75,7 +75,13 @@ class SetupWizard {
       prev3: document.getElementById('wizard-prev-3'),
       saveApi: document.getElementById('wizard-save-api'),
       
-      // Step 4 元素
+      // Step 4 元素 (JS-EYES)
+      prev4: document.getElementById('wizard-prev-4'),
+      skip4: document.getElementById('wizard-skip-4'),
+      next4: document.getElementById('wizard-next-4'),
+      openJsEyesBtn: document.getElementById('open-jseyes-github-btn'),
+      
+      // Step 5 元素 (完成)
       completeBtn: document.getElementById('wizard-complete-btn'),
       configSummary: document.getElementById('config-summary')
     };
@@ -104,7 +110,15 @@ class SetupWizard {
     this.elements.prev3?.addEventListener('click', () => this.goToStep(2));
     this.elements.saveApi?.addEventListener('click', () => this.saveApiConfig());
     
-    // Step 4 事件
+    // Step 4 事件 (JS-EYES)
+    this.elements.prev4?.addEventListener('click', () => this.goToStep(3));
+    this.elements.skip4?.addEventListener('click', () => this.goToStep(5));
+    this.elements.next4?.addEventListener('click', () => this.goToStep(5));
+    this.elements.openJsEyesBtn?.addEventListener('click', () => {
+      window.browserControlManager?.openExternalUrl?.('https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo/js-eyes');
+    });
+    
+    // Step 5 事件 (完成)
     this.elements.completeBtn?.addEventListener('click', () => this.complete());
   }
 
@@ -277,6 +291,8 @@ class SetupWizard {
     } else if (step === 3) {
       this.initApiConfigStep();
     } else if (step === 4) {
+      this.initJsEyesStep();
+    } else if (step === 5) {
       this.initCompleteStep();
     }
   }
@@ -404,6 +420,15 @@ class SetupWizard {
   }
 
   /**
+   * 初始化 JS-EYES 安装步骤
+   */
+  initJsEyesStep() {
+    // JS-EYES 是推荐依赖，不需要特殊检测
+    // 只显示安装指南，用户可以选择跳过
+    console.log('[SetupWizard] JS-EYES step initialized');
+  }
+
+  /**
    * Provider 变化处理
    */
   onProviderChange() {
@@ -497,7 +522,7 @@ class SetupWizard {
         // 更新需求状态
         this.wizardRequirements = await window.browserControlManager?.recheckSetup?.();
         
-        // 进入完成页
+        // 进入 JS-EYES 安装页
         setTimeout(() => {
           this.goToStep(4);
         }, 500);
