@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek Cowork - Open-Source Claude Cowork Alternative</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind 配置脚本 -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: '#f5f5f5',
+                        secondary: '#a3a3a3',
+                        dark: {
+                            900: '#171717',
+                            950: '#0a0a0a',
+                        },
+                        accent: {
+                            cyan: '#ffffff',
+                            purple: '#d4d4d4',
+                        }
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'spin-slow': 'spin 8s linear infinite',
+                        'reverse-spin': 'reverse-spin 1s linear infinite',
+                        'spin-slow-reverse': 'spin 12s linear infinite reverse',
+                        'spin-tilted': 'spin-tilted 5s linear infinite',
+                        'pulse-fast': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'fade-in': 'fadeIn 0.6s ease-out',
+                        'slide-up': 'slideUp 0.8s ease-out',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        'reverse-spin': {
+                            from: { transform: 'rotate(360deg)' },
+                            to: { transform: 'rotate(0deg)' },
+                        },
+                        'spin-tilted': {
+                            '0%': { transform: 'rotate3d(1, 1, 1, 0deg)' },
+                            '100%': { transform: 'rotate3d(1, 1, 1, 360deg)' },
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(30px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- 自定义样式 -->
+    <style>
+        body {
+            background-color: #000000;
+            background-image: none;
+        }
+        
+        /* 玻璃态效果 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333333; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555555; 
+        }
+        
+        /* 导航栏样式 */
+        .navbar {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        
+        /* 渐变文字 */
+        .gradient-text {
+            background: linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* 代码块样式 */
+        .code-block {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* 动画延迟 */
+        .animate-delay-100 { animation-delay: 0.1s; }
+        .animate-delay-200 { animation-delay: 0.2s; }
+        .animate-delay-300 { animation-delay: 0.3s; }
+        .animate-delay-400 { animation-delay: 0.4s; }
+
+        /* 新增动画效果 */
+        @keyframes flow {
+            0% { width: 0%; opacity: 0; }
+            50% { opacity: 1; }
+            100% { width: 100%; opacity: 0; }
+        }
+        .flow-line::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+            width: 50%;
+            animation: flow 2s infinite linear;
+            transform: translateX(-100%);
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.2); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); border-color: rgba(59, 130, 246, 0.5); }
+        }
+        .hover-glow:hover {
+            animation: pulse-glow 2s infinite;
+        }
+        
+        /* --- Workflow 板块新增样式 --- */
+        .step-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            overflow: hidden;
+        }
+        
+        .step-card:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 20px rgba(255,255,255,0.05);
+        }
+        
+        .step-card::before {
+            content: attr(data-step);
+            position: absolute;
+            top: -20px;
+            right: -10px;
+            font-size: 120px;
+            font-weight: 800;
+            color: rgba(255,255,255,0.02);
+            line-height: 1;
+            pointer-events: none;
+            transition: all 0.4s ease;
+            font-family: 'JetBrains Mono', monospace;
+            z-index: 0;
+        }
+        
+        .step-card:hover::before {
+            color: rgba(255,255,255,0.05);
+            transform: translateY(-5px) scale(1.05);
+        }
+
+        .step-icon-box {
+            position: relative;
+            z-index: 1;
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.4s ease;
+        }
+        
+        .step-card:hover .step-icon-box {
+            border-color: rgba(255,255,255,0.3);
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+            transform: scale(1.1) rotate(3deg);
+        }
+
+        .step-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 流光连接线动画 */
+        .flow-beam {
+            stroke-dasharray: 10 5;
+            animation: flowBeam 1s linear infinite;
+            opacity: 0.5;
+        }
+        
+        @keyframes flowBeam {
+            to { stroke-dashoffset: -15; }
+        }
+    </style>
+</head>
+<body class="bg-black min-h-screen font-sans text-neutral-200 relative overflow-x-hidden selection:bg-white/20 selection:text-white">
+    <!-- Three.js 背景容器 -->
+    <div class="fixed inset-0 -z-10 bg-black" id="canvas-container"></div>
+    
+    <!-- 导航栏 -->
+    <nav class="navbar fixed top-0 left-0 right-0 z-[1000] px-4 sm:px-6 lg:px-8 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 rounded-lg bg-black border border-white/10 flex items-center justify-center overflow-hidden">
+                    <svg width="32" height="32" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+                        <g transform="translate(64, 64)">
+                            <ellipse cx="0" cy="0" rx="42" ry="14" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.6" transform="rotate(-15)"/>
+                            <g fill="none" stroke="#ffffff" stroke-width="1.5">
+                                <circle cx="0" cy="0" r="28" opacity="0.9"/>
+                                <ellipse cx="0" cy="0" rx="28" ry="10" opacity="0.7"/>
+                                <ellipse cx="0" cy="0" rx="28" ry="10" opacity="0.7" transform="rotate(60)"/>
+                            </g>
+                            <circle cx="0" cy="0" r="3" fill="#ffffff"/>
+                        </g>
+                    </svg>
+                </div>
+                <span class="text-xl font-bold text-white">DeepSeek Cowork</span>
+            </div>
+            <div class="hidden md:flex items-center gap-6">
+                <a href="#features" class="text-neutral-300 hover:text-white transition-colors">Features</a>
+                <a href="#scenarios" class="text-neutral-300 hover:text-white transition-colors">Use Cases</a>
+                <a href="#architecture" class="text-neutral-300 hover:text-white transition-colors">Architecture</a>
+                <a href="#quickstart" class="text-neutral-300 hover:text-white transition-colors">Quick Start</a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="https://github.com/imjszhang/deepseek-cowork" target="_blank" class="btn btn-secondary px-4 py-2 rounded-lg text-sm font-semibold hidden sm:flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+                <a href="#quickstart" class="btn btn-primary px-6 py-2 rounded-lg text-sm font-semibold">Get Started</a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Hero 区域 -->
+    <section class="relative min-h-screen flex items-center justify-center pt-20 pb-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto text-center">
+            <div class="animate-slide-up">
+                <h1 class="text-4xl sm:text-5xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+                    <span class="gradient-text">Open-Source Alternative</span><br>
+                    <span class="text-neutral-300">to Claude Cowork</span>
+                </h1>
+                <p class="text-lg sm:text-xl text-neutral-400 max-w-3xl mx-auto mb-8 leading-relaxed">
+                    Implement all Claude Cowork features using DeepSeek.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <a href="https://github.com/imjszhang/deepseek-cowork" target="_blank" class="btn btn-primary px-8 py-4 rounded-lg text-base font-semibold w-full sm:w-auto">
+                        <span class="flex items-center gap-2 justify-center">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                            <span>View on GitHub</span>
+                        </span>
+                    </a>
+                    <a href="#quickstart" class="btn btn-secondary px-8 py-4 rounded-lg text-base font-semibold w-full sm:w-auto">
+                        <span class="flex items-center gap-2 justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <span>Quick Start</span>
+                        </span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- 特性标签 -->
+            <div class="mt-16 flex flex-wrap justify-center gap-3 animate-fade-in animate-delay-300">
+                <span class="px-4 py-2 rounded-full text-xs font-semibold bg-green-500/10 text-green-300 border border-green-500/20 hover:bg-green-500/20 transition-colors cursor-default flex items-center">
+                    <svg class="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Ultra-low Cost
+                </span>
+                <span class="px-4 py-2 rounded-full text-xs font-semibold bg-green-500/10 text-green-300 border border-green-500/20 hover:bg-green-500/20 transition-colors cursor-default flex items-center">
+                    <svg class="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Ready to Use
+                </span>
+                <span class="px-4 py-2 rounded-full text-xs font-semibold bg-green-500/10 text-green-300 border border-green-500/20 hover:bg-green-500/20 transition-colors cursor-default flex items-center">
+                    <svg class="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Fully Open Source
+                </span>
+                <span class="px-4 py-2 rounded-full text-xs font-semibold bg-green-500/10 text-green-300 border border-green-500/20 hover:bg-green-500/20 transition-colors cursor-default flex items-center">
+                    <svg class="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Self-hosting Support
+                </span>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 对比优势区域 -->
+    <section id="comparison" class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Why DeepSeek Cowork?</h2>
+                <p class="text-lg text-neutral-400 max-w-2xl mx-auto">
+                    On January 13, 2026, Anthropic released Claude Cowork. Great product, but...
+                </p>
+            </div>
+            
+            <div class="glass-card rounded-2xl p-8 overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="py-4 px-4 text-neutral-400 font-medium"></th>
+                            <th class="py-4 px-4 text-neutral-300 font-semibold">Claude Cowork</th>
+                            <th class="py-4 px-4 text-white font-semibold">DeepSeek Cowork</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr class="border-b border-white/5">
+                            <td class="py-4 px-4 text-neutral-400 font-medium">Price</td>
+                            <td class="py-4 px-4 text-neutral-400">Expensive</td>
+                            <td class="py-4 px-4 text-green-400 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Ultra-low cost
+                            </td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-4 px-4 text-neutral-400 font-medium">Accessibility</td>
+                            <td class="py-4 px-4 text-neutral-400">Complex setup, regional restrictions</td>
+                            <td class="py-4 px-4 text-green-400 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Ready to use
+                            </td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-4 px-4 text-neutral-400 font-medium">Open Source</td>
+                            <td class="py-4 px-4 text-neutral-400">Proprietary</td>
+                            <td class="py-4 px-4 text-green-400 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Fully open source
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="py-4 px-4 text-neutral-400 font-medium">Self-hosting</td>
+                            <td class="py-4 px-4 text-neutral-400">Not supported</td>
+                            <td class="py-4 px-4 text-green-400 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Supports private deployment
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Why DeepSeek -->
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-card rounded-xl p-6 text-center">
+                    <div class="w-12 h-12 mx-auto mb-4 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Solid Baseline</h3>
+                    <p class="text-sm text-neutral-400">Reliable performance among open-source LLMs</p>
+                </div>
+                <div class="glass-card rounded-xl p-6 text-center">
+                    <div class="w-12 h-12 mx-auto mb-4 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Ultra Affordable</h3>
+                    <p class="text-sm text-neutral-400">Most competitive API pricing</p>
+                </div>
+                <div class="glass-card rounded-xl p-6 text-center">
+                    <div class="w-12 h-12 mx-auto mb-4 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Fully Open</h3>
+                    <p class="text-sm text-neutral-400">Supports local deployment & customization</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 功能特性区域 -->
+    <section id="features" class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">What Can It Do?</h2>
+                <p class="text-lg text-neutral-400 max-w-2xl mx-auto">
+                    Use natural language to have AI help you with daily tasks
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- 浏览器自动化 -->
+                <div class="glass-card rounded-2xl p-8 border-l-4 border-l-white/20 transition-all hover:scale-[1.02]">
+                    <div class="w-14 h-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Browser Automation</h3>
+                    <p class="text-neutral-400 text-sm leading-relaxed mb-4">
+                        Open pages, batch fill forms, extract data, cross-site operations. Control your browser with natural language.
+                    </p>
+                    <ul class="text-xs text-neutral-500 space-y-1">
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>Tab control & navigation</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>Script execution</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>Data extraction</li>
+                    </ul>
+                </div>
+                
+                <!-- 文件管理 -->
+                <div class="glass-card rounded-2xl p-8 border-l-4 border-l-white/20 transition-all hover:scale-[1.02]">
+                    <div class="w-14 h-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">File Management</h3>
+                    <p class="text-neutral-400 text-sm leading-relaxed mb-4">
+                        Browse, organize, and preview your workspace files. Let AI help you manage your digital workspace efficiently.
+                    </p>
+                    <ul class="text-xs text-neutral-500 space-y-1">
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>File browsing & preview</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>Smart organization</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>Batch operations</li>
+                    </ul>
+                </div>
+                
+                <!-- 持久记忆 -->
+                <div class="glass-card rounded-2xl p-8 border-l-4 border-l-white/20 transition-all hover:scale-[1.02]">
+                    <div class="w-14 h-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Persistent Memory</h3>
+                    <p class="text-neutral-400 text-sm leading-relaxed mb-4">
+                        AI remembers conversation context, understands your habits. Like having a 24/7 digital assistant at your command.
+                    </p>
+                    <ul class="text-xs text-neutral-500 space-y-1">
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>Context awareness</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>Learning your habits</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-neutral-500 rounded-full"></span>E2E encrypted sync</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 典型场景区域 -->
+    <section id="scenarios" class="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <!-- 背景装饰 -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-7xl pointer-events-none z-0">
+            <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse-fast"></div>
+            <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[100px] animate-pulse-fast" style="animation-delay: 1s;"></div>
+        </div>
+
+        <div class="max-w-7xl mx-auto relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 tracking-tight">
+                    Typical <span class="gradient-text">Use Cases</span>
+                </h2>
+                <p class="text-lg text-neutral-400 max-w-2xl mx-auto">
+                    Tell the AI what you need in plain language, and watch it work for you.
+                </p>
+            </div>
+            
+            <!-- 场景卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+                <!-- 数据收集 -->
+                <div class="glass-card rounded-2xl p-6 hover:border-white/20 transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-white font-semibold mb-2">Data Collection</h3>
+                            <p class="text-neutral-400 text-sm italic">"Extract prices from these 10 pages and make a spreadsheet"</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 表单填写 -->
+                <div class="glass-card rounded-2xl p-6 hover:border-white/20 transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-white font-semibold mb-2">Form Filling</h3>
+                            <p class="text-neutral-400 text-sm italic">"Batch fill registration forms using this contact list"</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 内容整理 -->
+                <div class="glass-card rounded-2xl p-6 hover:border-white/20 transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-white font-semibold mb-2">Content Organization</h3>
+                            <p class="text-neutral-400 text-sm italic">"Sort files in my downloads folder by type"</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 监控 -->
+                <div class="glass-card rounded-2xl p-6 hover:border-white/20 transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-white font-semibold mb-2">Monitoring</h3>
+                            <p class="text-neutral-400 text-sm italic">"Check this page daily and notify me of updates"</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 演示终端 -->
+            <div class="glass-card rounded-2xl p-6 code-block h-[360px] flex flex-col relative z-10">
+                <div class="flex items-center gap-2 mb-4 shrink-0">
+                    <div class="w-3 h-3 rounded-full bg-red-500/50"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500/50"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500/50"></div>
+                    <span class="ml-4 text-xs text-neutral-500 font-mono">deepseek-cowork</span>
+                </div>
+                <div id="terminal-logs" class="font-mono text-sm space-y-2 overflow-hidden flex-1 flex flex-col justify-end pb-2">
+                    <!-- Terminal output will be generated by JS -->
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 技术架构区域 -->
+    <section id="architecture" class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Core Components</h2>
+                <p class="text-lg text-neutral-400 max-w-2xl mx-auto">
+                    Built on proven open-source technologies
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Claude Code -->
+                <div class="glass-card rounded-2xl p-6 text-center hover:border-white/30 transition-colors group">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-white/20 transition-colors">
+                        <svg class="w-8 h-8 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Claude Code</h3>
+                    <p class="text-sm text-neutral-400">AI kernel for code understanding and generation</p>
+                </div>
+                
+                <!-- Happy -->
+                <a href="https://github.com/anthropics/happy" target="_blank" class="glass-card rounded-2xl p-6 text-center hover:border-white/30 transition-colors group cursor-pointer">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-white/20 transition-colors">
+                        <svg class="w-8 h-8 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Happy</h3>
+                    <p class="text-sm text-neutral-400">AI session management, E2E encryption, multi-device sync</p>
+                    <span class="inline-block mt-2 text-xs text-neutral-500 group-hover:text-white transition-colors">View on GitHub →</span>
+                </a>
+                
+                <!-- JS Eyes -->
+                <a href="https://github.com/anthropics/js-eyes" target="_blank" class="glass-card rounded-2xl p-6 text-center hover:border-white/30 transition-colors group cursor-pointer">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-white/20 transition-colors">
+                        <svg class="w-8 h-8 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">JS Eyes</h3>
+                    <p class="text-sm text-neutral-400">Browser extension for tab control, script execution, data extraction</p>
+                    <span class="inline-block mt-2 text-xs text-neutral-500 group-hover:text-white transition-colors">View on GitHub →</span>
+                </a>
+                
+                <!-- Electron -->
+                <a href="https://www.electronjs.org/" target="_blank" class="glass-card rounded-2xl p-6 text-center hover:border-white/30 transition-colors group cursor-pointer">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-white/20 transition-colors">
+                        <svg class="w-8 h-8 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Electron App</h3>
+                    <p class="text-sm text-neutral-400">Cross-platform desktop interface integrating all components</p>
+                    <span class="inline-block mt-2 text-xs text-neutral-500 group-hover:text-white transition-colors">Learn more →</span>
+                </a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Quick Start 区域 -->
+    <section id="quickstart" class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">Quick Start</h2>
+                <p class="text-lg text-neutral-400 max-w-2xl mx-auto">
+                    Get up and running in minutes
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- 左侧：安装步骤 -->
+                <div class="glass-card rounded-2xl p-8">
+                    <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-sm font-mono">1</span>
+                        Install the App
+                    </h3>
+                    
+                    <!-- 代码块 -->
+                    <div class="code-block rounded-lg p-4 mb-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs text-neutral-500 font-mono">Terminal</span>
+                            <button onclick="navigator.clipboard.writeText('git clone https://github.com/imjszhang/deepseek-cowork.git\ncd deepseek-cowork\nnpm install\nnpm start')" class="text-xs text-neutral-500 hover:text-white transition-colors">Copy</button>
+                        </div>
+                        <pre class="text-sm text-neutral-300 font-mono overflow-x-auto"><code><span class="text-neutral-500">$</span> git clone https://github.com/imjszhang/deepseek-cowork.git
+<span class="text-neutral-500">$</span> cd deepseek-cowork
+<span class="text-neutral-500">$</span> npm install
+<span class="text-neutral-500">$</span> npm start</code></pre>
+                    </div>
+                    
+                    <p class="text-sm text-neutral-400 mb-4">
+                        Development mode: <code class="text-neutral-300 bg-white/5 px-2 py-0.5 rounded">npm run dev</code>
+                    </p>
+                </div>
+                
+                <!-- 右侧：浏览器扩展安装 -->
+                <div class="glass-card rounded-2xl p-8">
+                    <h3 class="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-sm font-mono">2</span>
+                        Install Browser Extension
+                    </h3>
+                    
+                    <p class="text-neutral-400 text-sm mb-6">
+                        Browser automation requires the <a href="https://github.com/imjszhang/js-eyes" target="_blank" class="text-white hover:underline">JS Eyes</a> extension.
+                    </p>
+                    
+                    <div class="space-y-3">
+                        <div class="flex items-start gap-3 p-3 rounded-lg bg-black/30 border border-white/5">
+                            <span class="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-xs font-mono flex-shrink-0">1</span>
+                            <p class="text-sm text-neutral-400">Download <a href="https://github.com/imjszhang/js-eyes" target="_blank" class="text-white hover:underline">JS Eyes</a> from GitHub</p>
+                        </div>
+                        <div class="flex items-start gap-3 p-3 rounded-lg bg-black/30 border border-white/5">
+                            <span class="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-xs font-mono flex-shrink-0">2</span>
+                            <div class="text-sm text-neutral-400">
+                                Open browser extension page:
+                                <ul class="mt-1 space-y-1 text-neutral-500">
+                                    <li>Chrome: <code class="text-neutral-400">chrome://extensions/</code></li>
+                                    <li>Edge: <code class="text-neutral-400">edge://extensions/</code></li>
+                                    <li>Firefox: <code class="text-neutral-400">about:debugging</code></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3 p-3 rounded-lg bg-black/30 border border-white/5">
+                            <span class="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-xs font-mono flex-shrink-0">3</span>
+                            <p class="text-sm text-neutral-400">Enable "Developer mode" and load unpacked extension</p>
+                        </div>
+                        <div class="flex items-start gap-3 p-3 rounded-lg bg-black/30 border border-white/5">
+                            <span class="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-xs font-mono flex-shrink-0">4</span>
+                            <p class="text-sm text-neutral-400">Make sure DeepSeek Cowork is running - extension will auto-connect</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- CTA 区域 -->
+    <section class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="glass-card rounded-2xl p-12 text-center">
+                <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Ready to Get Started?</h2>
+                <p class="text-lg text-neutral-400 mb-8 max-w-2xl mx-auto">
+                    Making great AI assistants accessible to everyone
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="https://github.com/imjszhang/deepseek-cowork" target="_blank" class="btn btn-primary px-8 py-4 rounded-lg text-base font-semibold">
+                        <span class="flex items-center gap-2 justify-center">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                            <span>Star on GitHub</span>
+                        </span>
+                    </a>
+                    <a href="#quickstart" class="btn btn-secondary px-8 py-4 rounded-lg text-base font-semibold">
+                        <span class="flex items-center gap-2 justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <span>Quick Start</span>
+                        </span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 页脚 -->
+    <footer class="relative py-12 px-4 sm:px-6 lg:px-8 border-t border-white/10">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-8 h-8 rounded-lg bg-black border border-white/10 flex items-center justify-center overflow-hidden">
+                            <svg width="24" height="24" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+                                <g transform="translate(64, 64)">
+                                    <ellipse cx="0" cy="0" rx="42" ry="14" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.6" transform="rotate(-15)"/>
+                                    <g fill="none" stroke="#ffffff" stroke-width="2">
+                                        <circle cx="0" cy="0" r="28" opacity="0.9"/>
+                                        <ellipse cx="0" cy="0" rx="28" ry="10" opacity="0.7"/>
+                                    </g>
+                                    <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+                                </g>
+                            </svg>
+                        </div>
+                        <span class="text-lg font-bold text-white">DeepSeek Cowork</span>
+                    </div>
+                    <p class="text-sm text-neutral-400 mb-4">
+                        Making great AI assistants accessible to everyone.
+                    </p>
+                    <div class="flex items-center gap-3">
+                        <a href="https://x.com/imjszhang" target="_blank" class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-colors" title="Follow on X">
+                            <svg class="w-4 h-4 text-neutral-400 hover:text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                        </a>
+                        <a href="https://github.com/imjszhang/deepseek-cowork" target="_blank" class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-colors" title="View on GitHub">
+                            <svg class="w-4 h-4 text-neutral-400 hover:text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Product</h4>
+                    <ul class="space-y-2 text-sm text-neutral-400">
+                        <li><a href="#features" class="hover:text-white transition-colors">Features</a></li>
+                        <li><a href="#scenarios" class="hover:text-white transition-colors">Use Cases</a></li>
+                        <li><a href="#quickstart" class="hover:text-white transition-colors">Quick Start</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Built With</h4>
+                    <ul class="space-y-2 text-sm text-neutral-400">
+                        <li><a href="https://github.com/slopus/happy" target="_blank" class="hover:text-white transition-colors">Happy</a></li>
+                        <li><a href="https://github.com/imjszhang/js-eyes" target="_blank" class="hover:text-white transition-colors">JS Eyes</a></li>
+                        <li><a href="https://www.electronjs.org/" target="_blank" class="hover:text-white transition-colors">Electron</a></li>
+                        <li><a href="https://www.deepseek.com/" target="_blank" class="hover:text-white transition-colors">DeepSeek</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-sm text-neutral-400">
+                        <li><a href="https://github.com/imjszhang/deepseek-cowork" target="_blank" class="hover:text-white transition-colors">GitHub</a></li>
+                        <li><a href="./README_CN.md" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="https://github.com/imjszhang/deepseek-cowork/issues" target="_blank" class="hover:text-white transition-colors">Issues</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="pt-8 border-t border-white/10 text-center text-sm text-neutral-400">
+                <p>© 2026 DeepSeek Cowork. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Three.js 背景动画初始化脚本 -->
+    <script>
+        // --- Three.js Quantum Data Ocean & Holographic Sphere Animation ---
+        function initThreeJSBackground() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+
+            let camera, scene, renderer;
+            let particles, count = 0;
+            let sphereGroup, coreSphere, outerShell, rings = [];
+            let mouseX = 0, mouseY = 0;
+            let windowHalfX = window.innerWidth / 2;
+            let windowHalfY = window.innerHeight / 2;
+
+            init();
+            animate();
+
+            function init() {
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
+                camera.position.z = 1000;
+                camera.position.y = 200;
+
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x000000, 0.001);
+
+                // --- 1. 底部数据海洋 ---
+                const SEPARATION = 80, AMOUNTX = 60, AMOUNTY = 60;
+                const numParticles = AMOUNTX * AMOUNTY;
+                const positions = new Float32Array(numParticles * 3);
+                const scales = new Float32Array(numParticles);
+
+                let i = 0, j = 0;
+                for (let ix = 0; ix < AMOUNTX; ix++) {
+                    for (let iy = 0; iy < AMOUNTY; iy++) {
+                        positions[i] = ix * SEPARATION - ((AMOUNTX * SEPARATION) / 2);
+                        positions[i + 1] = 0;
+                        positions[i + 2] = iy * SEPARATION - ((AMOUNTY * SEPARATION) / 2);
+                        scales[j] = 1;
+                        i += 3;
+                        j++;
+                    }
+                }
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('scale', new THREE.BufferAttribute(scales, 1));
+
+                const material = new THREE.PointsMaterial({
+                    color: 0x555555,
+                    size: 2,
+                    transparent: true,
+                    opacity: 0.5,
+                    sizeAttenuation: true
+                });
+
+                particles = new THREE.Points(geometry, material);
+                particles.position.y = -300;
+                scene.add(particles);
+
+                // --- 2. 全息球体 ---
+                sphereGroup = new THREE.Group();
+                sphereGroup.position.y = 150;
+                scene.add(sphereGroup);
+
+                // A. 核心线框球
+                const coreGeo = new THREE.IcosahedronGeometry(180, 2);
+                const coreMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff, 
+                    wireframe: true, 
+                    transparent: true, 
+                    opacity: 0.3 
+                });
+                coreSphere = new THREE.Mesh(coreGeo, coreMat);
+                sphereGroup.add(coreSphere);
+
+                // B. 内部发光核
+                const innerGeo = new THREE.IcosahedronGeometry(100, 4);
+                const innerMat = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.1
+                });
+                const innerSphere = new THREE.Mesh(innerGeo, innerMat);
+                sphereGroup.add(innerSphere);
+
+                // C. 外部点阵壳
+                const shellGeo = new THREE.IcosahedronGeometry(240, 3);
+                const shellPos = shellGeo.attributes.position;
+                const shellPointsGeo = new THREE.BufferGeometry();
+                shellPointsGeo.setAttribute('position', shellPos);
+                
+                const shellMat = new THREE.PointsMaterial({
+                    color: 0xaaaaaa,
+                    size: 3,
+                    transparent: true,
+                    opacity: 0.6,
+                    sizeAttenuation: true
+                });
+                outerShell = new THREE.Points(shellPointsGeo, shellMat);
+                sphereGroup.add(outerShell);
+
+                // D. 旋转轨道环
+                const createRing = (radius, tube, radialSegments, tubularSegments, arc, rotation) => {
+                    const ringGeo = new THREE.TorusGeometry(radius, tube, radialSegments, tubularSegments, arc);
+                    const ringMat = new THREE.MeshBasicMaterial({ 
+                        color: 0xffffff, 
+                        wireframe: true,
+                        transparent: true,
+                        opacity: 0.2
+                    });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.rotation.set(rotation.x, rotation.y, rotation.z);
+                    sphereGroup.add(ring);
+                    rings.push(ring);
+                };
+
+                createRing(280, 2, 16, 100, Math.PI * 2, { x: Math.PI / 2, y: 0, z: 0 });
+                createRing(320, 1, 16, 100, Math.PI * 2, { x: Math.PI / 3, y: Math.PI / 6, z: 0 });
+                createRing(350, 1, 16, 100, Math.PI * 2, { x: -Math.PI / 4, y: 0, z: Math.PI / 6 });
+
+                // E. 浮动粒子云
+                const cloudGeo = new THREE.BufferGeometry();
+                const cloudCount = 200;
+                const cloudPos = new Float32Array(cloudCount * 3);
+                
+                for(let k=0; k<cloudCount*3; k+=3) {
+                    const r = 300 + Math.random() * 200;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    
+                    cloudPos[k] = r * Math.sin(phi) * Math.cos(theta);
+                    cloudPos[k+1] = r * Math.sin(phi) * Math.sin(theta);
+                    cloudPos[k+2] = r * Math.cos(phi);
+                }
+                
+                cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPos, 3));
+                const cloudMat = new THREE.PointsMaterial({
+                    color: 0x888888,
+                    size: 2,
+                    transparent: true,
+                    opacity: 0.4
+                });
+                const cloud = new THREE.Points(cloudGeo, cloudMat);
+                sphereGroup.add(cloud);
+
+                // 渲染器
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                container.appendChild(renderer.domElement);
+
+                // 事件监听
+                document.addEventListener('mousemove', onDocumentMouseMove);
+                window.addEventListener('resize', onWindowResize);
+            }
+
+            function onWindowResize() {
+                windowHalfX = window.innerWidth / 2;
+                windowHalfY = window.innerHeight / 2;
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            function onDocumentMouseMove(event) {
+                mouseX = event.clientX - windowHalfX;
+                mouseY = event.clientY - windowHalfY;
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                render();
+            }
+
+            function render() {
+                // 摄像机跟随鼠标缓慢移动
+                camera.position.x += (mouseX - camera.position.x) * 0.02;
+                camera.position.y += (-mouseY + 200 - camera.position.y) * 0.02;
+                camera.lookAt(scene.position);
+
+                // 1. 粒子波浪动画
+                const positions = particles.geometry.attributes.position.array;
+                let i = 0;
+                const SEPARATION = 80, AMOUNTX = 60, AMOUNTY = 60;
+                for (let ix = 0; ix < AMOUNTX; ix++) {
+                    for (let iy = 0; iy < AMOUNTY; iy++) {
+                        positions[i + 1] = (Math.sin((ix + count) * 0.3) * 50) +
+                                           (Math.sin((iy + count) * 0.5) * 50);
+                        i += 3;
+                    }
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
+                count += 0.1;
+
+                // 2. 全息球动画
+                if (sphereGroup) {
+                    sphereGroup.position.y = 150 + Math.sin(count * 0.2) * 20;
+                    coreSphere.rotation.y += 0.005;
+                    coreSphere.rotation.z += 0.002;
+                    outerShell.rotation.y -= 0.003;
+                    rings.forEach((ring, idx) => {
+                        ring.rotation.x += 0.002 * (idx + 1);
+                        ring.rotation.y += 0.002 * (idx + 1);
+                    });
+                    sphereGroup.rotation.x = mouseY * 0.0005;
+                    sphereGroup.rotation.y = mouseX * 0.0005;
+                }
+
+                renderer.render(scene, camera);
+            }
+        }
+
+        // 启动 Three.js 背景
+        initThreeJSBackground();
+        
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+    <!-- 数据统计与演示面板增强脚本 -->
+    <script>
+        // 1. 数字增长动画
+        function initCounters() {
+            const counters = document.querySelectorAll('.counter-value');
+            const options = {
+                threshold: 0.5
+            };
+
+            const observer = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const counter = entry.target;
+                        const target = parseFloat(counter.getAttribute('data-target'));
+                        const duration = 2000; // 2秒
+                        const start = 0;
+                        const startTime = performance.now();
+
+                        function update(currentTime) {
+                            const elapsed = currentTime - startTime;
+                            const progress = Math.min(elapsed / duration, 1);
+                            
+                            // Ease out quart
+                            const ease = 1 - Math.pow(1 - progress, 4);
+                            
+                            const current = start + (target - start) * ease;
+                            
+                            if (target % 1 !== 0) {
+                                counter.innerText = current.toFixed(1);
+                            } else {
+                                counter.innerText = Math.floor(current);
+                            }
+
+                            if (progress < 1) {
+                                requestAnimationFrame(update);
+                            } else {
+                                counter.innerText = target; // Ensure final value is exact
+                            }
+                        }
+                        
+                        requestAnimationFrame(update);
+                        observer.unobserve(counter);
+                    }
+                });
+            }, options);
+
+            counters.forEach(counter => observer.observe(counter));
+        }
+
+        // 2. 模拟监控面板实时状态
+        function initDemoPanel() {
+            const tasks = [
+                { id: 'task-001', name: '任务 #001', states: ['running', 'stopped', 'starting'] },
+                { id: 'task-002', name: '任务 #002', states: ['stopped', 'starting', 'running'] },
+                { id: 'task-003', name: '任务 #003', states: ['starting', 'running', 'stopped'] }
+            ];
+
+            const stateConfig = {
+                'running': { class: 'bg-green-500/20 text-green-300 border-green-500/30', label: '运行中', indicator: 'bg-green-500 animate-pulse' },
+                'stopped': { class: 'bg-red-500/20 text-red-300 border-red-500/30', label: '已停止', indicator: 'bg-red-500' },
+                'starting': { class: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30', label: '启动中', indicator: 'bg-yellow-500 animate-pulse' }
+            };
+
+            // 随机更新状态
+            setInterval(() => {
+                const randomTaskIndex = Math.floor(Math.random() * 3);
+                // 简单的 DOM 查找，实际项目中建议用 ID
+                const panelRows = document.querySelectorAll('#demo .glass-card .space-y-3 > div');
+                if (panelRows.length < 3) return;
+
+                const row = panelRows[randomTaskIndex];
+                const indicator = row.querySelector('.status-indicator');
+                const badge = row.querySelector('span.text-xs');
+                
+                // 随机切换到下一个状态
+                const states = ['running', 'stopped', 'starting'];
+                const randomStateKey = states[Math.floor(Math.random() * states.length)];
+                const config = stateConfig[randomStateKey];
+
+                // 更新 UI
+                if (badge && indicator) {
+                    badge.className = `text-xs px-2 py-1 rounded border ${config.class} transition-all duration-500`;
+                    badge.textContent = config.label;
+                    
+                    // 更新指示灯颜色 (需配合 CSS)
+                    indicator.className = `status-indicator w-2 h-2 rounded-full ${config.indicator} transition-colors duration-500`;
+                }
+            }, 2500);
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            initCounters();
+            initDemoPanel();
+        });
+    </script>
+    
+    <!-- Terminal 动画脚本 -->
+    <script>
+        function initTerminalAnimation() {
+            const terminal = document.getElementById('terminal-logs');
+            if (!terminal) return;
+
+            const commands = [
+                { type: 'cmd', text: 'npm start' },
+                { type: 'info', text: 'Starting DeepSeek Cowork...' },
+                { type: 'success', text: 'Electron app initialized' },
+                { type: 'success', text: 'Happy session manager connected' },
+                { type: 'success', text: 'JS Eyes extension detected' },
+                { type: 'info', text: 'DeepSeek Cowork v1.0.0 running...' },
+                { type: 'process', text: 'User: "Extract prices from these 10 pages"' },
+                { type: 'info', text: 'Analyzing task requirements...' },
+                { type: 'sub', text: '├─ Opening browser tabs...' },
+                { type: 'sub', text: '├─ Navigating to target pages...' },
+                { type: 'info', text: 'Extracting data from page 1/10' },
+                { type: 'sub', text: '│  Progress: [##################--] 90%' },
+                { type: 'success', text: 'Data extraction complete' },
+                { type: 'sub', text: '└─ Generating spreadsheet...' },
+                { type: 'success', text: 'Spreadsheet saved: ~/Downloads/prices.xlsx' },
+                { type: 'process', text: 'User: "Sort my downloads by file type"' },
+                { type: 'info', text: 'Scanning Downloads folder...' },
+                { type: 'success', text: 'Found 47 files, organizing...' },
+                { type: 'sub', text: '├─ Images: 12 files → /Images' },
+                { type: 'sub', text: '├─ Documents: 23 files → /Documents' },
+                { type: 'sub', text: '└─ Others: 12 files → /Others' },
+                { type: 'success', text: 'File organization complete!' },
+                { type: 'info', text: 'Memory synced to cloud (E2E encrypted)' }
+            ];
+
+            const maxLines = 12;
+            let lineIndex = 0;
+
+            function createLogLine(log) {
+                const div = document.createElement('div');
+                div.className = 'animate-fade-in transition-all duration-300 leading-tight';
+                
+                let content = '';
+                switch(log.type) {
+                    case 'cmd':
+                        content = `<span class="text-neutral-500 mr-2">$</span><span class="text-white font-bold">${log.text}</span>`;
+                        break;
+                    case 'success':
+                        content = `<span class="text-green-400 mr-2">✓</span><span class="text-neutral-300">${log.text}</span>`;
+                        break;
+                    case 'info':
+                        content = `<span class="text-blue-400 mr-2">ℹ</span><span class="text-neutral-400">${log.text}</span>`;
+                        break;
+                    case 'process':
+                        content = `<span class="text-yellow-400 mr-2">→</span><span class="text-blue-200">${log.text}</span>`;
+                        break;
+                    case 'sub':
+                        content = `<span class="text-neutral-500 pl-6">${log.text}</span>`;
+                        break;
+                    default:
+                        content = `<span class="text-neutral-400">${log.text}</span>`;
+                }
+                
+                div.innerHTML = content;
+                return div;
+            }
+
+            function addLine(index) {
+                const log = commands[index];
+                const newLine = createLogLine(log);
+                terminal.appendChild(newLine);
+                
+                if (terminal.children.length > maxLines) {
+                    terminal.removeChild(terminal.firstElementChild);
+                }
+            }
+            
+            function loop() {
+                addLine(lineIndex);
+                lineIndex = (lineIndex + 1) % commands.length;
+                const delay = Math.random() * 1000 + 800; // 0.8s - 1.8s delay
+                setTimeout(loop, delay);
+            }
+
+            // 初始填充
+            for(let i = 0; i < 8; i++) {
+                addLine(lineIndex);
+                lineIndex = (lineIndex + 1) % commands.length;
+            }
+            
+            // 启动循环
+            setTimeout(loop, 1000);
+        }
+
+        // 启动 Terminal 动画
+        initTerminalAnimation();
+    </script>
+</body>
+</html>
+

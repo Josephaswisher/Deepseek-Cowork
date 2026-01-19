@@ -1,0 +1,59 @@
+{
+  "name": "deepseek-cowork",
+  "version": "0.1.0",
+  "description": "Open-Source Alternative to Claude Cowork - Implement all Claude Cowork features using DeepSeek",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "server": "node server/index.js",
+    "rebuild": "electron-rebuild -f -w sqlite3",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
+    "prebuild": "node scripts/generate-icon.js && node scripts/update-version.js",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder --win --mac --linux"
+  },
+  "keywords": [
+    "deepseek",
+    "claude-cowork",
+    "open-source",
+    "ai-assistant",
+    "browser-automation",
+    "file-management",
+    "llm",
+    "claude-code",
+    "electron",
+    "browser-control",
+    "automation",
+    "browser-extension",
+    "ai",
+    "management"
+  ],
+  "author": "",
+  "license": "MIT",
+  "homepage": "./",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chokidar": "^3.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "happy-coder": "file:./lib/happy-cli",
+    "libsodium-wrappers": "^0.7.13",
+    "socket.io-client": "^4.7.0",
+    "sqlite3": "^5.1.6",
+    "uuid": "^9.0.0",
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.33.5"
+  }
+}

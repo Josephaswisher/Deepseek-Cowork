@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# Data files
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+logs/
+*.log
+
+# Environment and local config
+.env
+.env.local
+config/local.js
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Electron builder output
+release/
+
+# Package lock (optional - uncomment if you want to ignore it)
+# package-lock.json
+
+# happy-cli 本地依赖
+lib/happy-cli/node_modules/
+lib/happy-cli/.git/
+
+# happy-cli 解压后的二进制文件（由 postinstall 自动生成，difft.exe 超过 100MB）
+lib/happy-cli/tools/unpacked/

@@ -1,0 +1,112 @@
+appId: com.deepseek.cowork
+productName: DeepSeek Cowork
+copyright: Copyright © 2025
+
+# 目录配置
+directories:
+  output: dist
+  buildResources: build
+
+# 应用信息
+extraMetadata:
+  main: electron/main.js
+
+# 文件包含/排除
+files:
+  - "**/*"
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+  - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
+  - "!**/node_modules/*.d.ts"
+  - "!**/node_modules/.bin"
+  - "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}"
+  - "!.editorconfig"
+  - "!**/._*"
+  - "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}"
+  - "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}"
+  - "!**/{appveyor.yml,.travis.yml,circle.yml}"
+  - "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
+  - "!archives/**"
+  - "!dist/**"
+  - "!build/**"
+
+# Windows 配置
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: icons/icon.ico
+  requestedExecutionLevel: asInvoker
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  sign: null  # 禁用代码签名（开发环境）
+  signingHashAlgorithms: []  # 禁用签名哈希算法
+
+# macOS 配置
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: icons/icon-256.png
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: null
+  entitlementsInherit: null
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
+# Linux 配置
+linux:
+  target:
+    - AppImage
+    - deb
+    - rpm
+  icon: icons/icon-256.png
+  category: Utility
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
+# NSIS 安装程序配置（Windows）
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DeepSeek Cowork
+
+# DMG 配置（macOS）
+dmg:
+  title: "${productName} ${version}"
+  icon: icons/icon-256.png
+  contents:
+    - x: 410
+      y: 150
+      type: "link"
+      path: "/Applications"
+    - x: 130
+      y: 150
+      type: "file"
+
+# 压缩配置
+compression: normal
+
+# 跳过 native 依赖的重新编译（如果已安装）
+npmRebuild: false
+
+# ASAR 配置
+# 确保 server 和 lib 目录可以被正确访问
+# 注意：asar 中的文件可以通过 require() 和 fs.readFileSync() 访问
+# 但如果需要执行二进制文件或需要原生模块，需要 unpack
+asar: true
+# 如果需要 unpack 某些目录（例如包含二进制文件的目录），取消下面的注释
+# asarUnpack:
+#   - "lib/happy-cli/tools/unpacked/**/*"
+
+# 发布配置（如果需要自动发布到 GitHub Releases）
+# publish:
+#   provider: github
+#   owner: your-username
+#   repo: deepseek-cowork
