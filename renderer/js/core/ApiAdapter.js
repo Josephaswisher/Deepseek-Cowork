@@ -14,13 +14,33 @@
  * @returns {'electron' | 'web'} 环境类型
  */
 function detectEnvironment() {
-    // 检查是否有 Electron IPC 接口
+    // 方法1: 检查 Electron 特有的全局对象
+    if (typeof process !== 'undefined' && process.versions && process.versions.electron) {
+        return 'electron';
+    }
+    
+    // 方法2: 检查 Electron preload 注入的 API
+    if (window.electronAPI || window.__ELECTRON__) {
+        return 'electron';
+    }
+    
+    // 方法3: 检查 browserControlManager 是否是真正的 Electron IPC 接口
+    // 真正的 Electron IPC 接口会有特定的方法签名
     if (window.browserControlManager && typeof window.browserControlManager === 'object') {
-        // 进一步检查是否有关键方法
-        if (typeof window.browserControlManager.getServerStatus === 'function') {
+        // 检查是否有多个关键的 IPC 方法（浏览器扩展不会有这些）
+        const hasIpcMethods = [
+            'getServerStatus',
+            'minimizeWindow',
+            'maximizeWindow',
+            'closeWindow',
+            'getAppVersion'
+        ].every(method => typeof window.browserControlManager[method] === 'function');
+        
+        if (hasIpcMethods) {
             return 'electron';
         }
     }
+    
     return 'web';
 }
 
@@ -546,7 +566,9 @@ function createBrowserControlManagerPolyfill() {
 }
 
 // 在 Web 模式下创建 polyfill
-if (detectEnvironment() === 'web' && !window.browserControlManager) {
+// 注意：即使浏览器扩展已经创建了 browserControlManager，也需要用 polyfill 覆盖
+// 因为扩展创建的对象不包含完整的方法集
+if (detectEnvironment() === 'web') {
     console.log('[ApiAdapter] Creating browserControlManager polyfill for Web mode');
     window.browserControlManager = createBrowserControlManagerPolyfill();
 }
