@@ -822,6 +822,109 @@ contextBridge.exposeInMainWorld('browserControlManager', {
    */
   quitApp: () => ipcRenderer.invoke('app:quit'),
 
+  // ============ 自动更新 API ============
+  
+  /**
+   * 检查更新
+   * @returns {Promise<Object>} { success, updateInfo? } 或 { success: false, error }
+   */
+  checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
+  
+  /**
+   * 下载更新
+   * @returns {Promise<Object>} { success } 或 { success: false, error }
+   */
+  downloadUpdate: () => ipcRenderer.invoke('updater:downloadUpdate'),
+  
+  /**
+   * 获取更新状态
+   * @returns {Promise<Object>} { status, currentVersion, updateInfo?, downloadProgress?, error? }
+   */
+  getUpdateStatus: () => ipcRenderer.invoke('updater:getStatus'),
+  
+  /**
+   * 退出并安装更新
+   * @returns {Promise<boolean>} 是否成功
+   */
+  quitAndInstall: () => ipcRenderer.invoke('updater:quitAndInstall'),
+  
+  /**
+   * 监听更新状态变化
+   * @param {Function} callback - 回调函数 (data: { status, updateInfo?, downloadProgress?, error? })
+   * @returns {Function} 取消监听函数
+   */
+  onUpdateStatusChanged: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('updater:statusChanged', handler);
+    return () => ipcRenderer.removeListener('updater:statusChanged', handler);
+  },
+  
+  /**
+   * 监听检查更新事件
+   * @param {Function} callback - 回调函数
+   * @returns {Function} 取消监听函数
+   */
+  onUpdateChecking: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('updater:checking', handler);
+    return () => ipcRenderer.removeListener('updater:checking', handler);
+  },
+  
+  /**
+   * 监听有新版本可用事件
+   * @param {Function} callback - 回调函数 (data: { version, releaseDate, releaseNotes, currentVersion })
+   * @returns {Function} 取消监听函数
+   */
+  onUpdateAvailable: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('updater:available', handler);
+    return () => ipcRenderer.removeListener('updater:available', handler);
+  },
+  
+  /**
+   * 监听无更新事件
+   * @param {Function} callback - 回调函数 (data: { version, currentVersion })
+   * @returns {Function} 取消监听函数
+   */
+  onUpdateNotAvailable: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('updater:not-available', handler);
+    return () => ipcRenderer.removeListener('updater:not-available', handler);
+  },
+  
+  /**
+   * 监听下载进度事件
+   * @param {Function} callback - 回调函数 (data: { percent, bytesPerSecond, transferred, total })
+   * @returns {Function} 取消监听函数
+   */
+  onUpdateDownloadProgress: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('updater:download-progress', handler);
+    return () => ipcRenderer.removeListener('updater:download-progress', handler);
+  },
+  
+  /**
+   * 监听下载完成事件
+   * @param {Function} callback - 回调函数 (data: { version, releaseDate, releaseNotes })
+   * @returns {Function} 取消监听函数
+   */
+  onUpdateDownloaded: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('updater:downloaded', handler);
+    return () => ipcRenderer.removeListener('updater:downloaded', handler);
+  },
+  
+  /**
+   * 监听更新错误事件
+   * @param {Function} callback - 回调函数 (data: { message })
+   * @returns {Function} 取消监听函数
+   */
+  onUpdateError: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('updater:error', handler);
+    return () => ipcRenderer.removeListener('updater:error', handler);
+  },
+
   /**
    * 监听 Happy Service 状态变化
    * @param {Function} callback - 回调函数

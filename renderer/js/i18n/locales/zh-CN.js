@@ -243,6 +243,23 @@
       serverStatus: '服务器状态',
       extensionConnections: '扩展连接',
       
+      // 软件更新
+      softwareUpdate: '软件更新',
+      currentVersion: '当前版本:',
+      newVersion: '新版本:',
+      downloadProgress: '下载进度:',
+      checkUpdate: '检查更新',
+      downloadUpdate: '立即下载',
+      installUpdate: '重启并安装',
+      skipUpdate: '稍后提醒',
+      upToDate: '已是最新版本',
+      updateAvailable: '有新版本',
+      downloading: '下载中...',
+      updateReady: '更新就绪',
+      updateError: '更新失败',
+      updateCheckFailed: '检查更新失败',
+      downloadFailed: '下载更新失败',
+      
       rerunWizard: '重新运行设置向导',
       rerunWizardHint: '如果遇到配置问题，可以重新运行设置向导',
       partialLimited: '部分功能将受限',
@@ -554,6 +571,10 @@
     
     // 通知消息
     notifications: {
+      // 软件更新通知
+      updateAvailable: '发现新版本 v{version}，可以下载更新',
+      updateReady: '更新已下载完成，重启后生效',
+      
       daemonStarting: '正在启动 Daemon...',
       daemonStopping: '正在停止 Daemon...',
       daemonRestarting: '正在重启 Daemon...',

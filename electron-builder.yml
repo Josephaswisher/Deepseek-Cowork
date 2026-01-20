@@ -1,6 +1,6 @@
 appId: com.deepseek.cowork
 productName: DeepSeek Cowork
-copyright: Copyright © 2025
+copyright: Copyright © 2026
 
 # 目录配置
 directories:
@@ -114,8 +114,9 @@ asarUnpack:
   - "node_modules/libsodium-wrappers/**/*"
   - "node_modules/libsodium/**/*"
 
-# 发布配置（如果需要自动发布到 GitHub Releases）
-# publish:
-#   provider: github
-#   owner: your-username
-#   repo: deepseek-cowork
+# 发布配置 - 自动更新使用 GitHub Releases
+publish:
+  provider: github
+  owner: imjszhang
+  repo: deepseek-cowork
+  releaseType: release

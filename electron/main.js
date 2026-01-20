@@ -16,6 +16,7 @@ const os = require('os');
 // 管理器
 const ServerManager = require('./managers/server-manager');
 const ViewManager = require('./managers/view-manager');
+const UpdateManager = require('./managers/update-manager');
 
 // Happy Service
 const HappyService = require('../lib/happy-service');
@@ -39,6 +40,7 @@ const fileManager = require('./managers/file-manager');
 let mainWindow = null;
 let serverManager = null;
 let viewManager = null;
+let updateManager = null;
 let isQuitting = false;
 let happyServiceInitialized = false;
 
@@ -1379,6 +1381,36 @@ function setupIpcHandlers() {
     app.quit();
   });
 
+  // ============ 自动更新 IPC 处理器 ============
+
+  ipcMain.handle('updater:checkForUpdates', async () => {
+    if (!updateManager) {
+      return { success: false, error: 'UpdateManager not initialized' };
+    }
+    return await updateManager.checkForUpdates();
+  });
+
+  ipcMain.handle('updater:downloadUpdate', async () => {
+    if (!updateManager) {
+      return { success: false, error: 'UpdateManager not initialized' };
+    }
+    return await updateManager.downloadUpdate();
+  });
+
+  ipcMain.handle('updater:getStatus', () => {
+    if (!updateManager) {
+      return { status: 'idle', error: 'UpdateManager not initialized' };
+    }
+    return updateManager.getStatus();
+  });
+
+  ipcMain.handle('updater:quitAndInstall', () => {
+    if (!updateManager) {
+      return { success: false, error: 'UpdateManager not initialized' };
+    }
+    return updateManager.quitAndInstall();
+  });
+
   // ============ 依赖检查 IPC 处理器 ============
 
   ipcMain.handle('deps:getStatus', () => {
@@ -2160,6 +2192,12 @@ async function cleanupAndQuit() {
       viewManager = null;
     }
     
+    // Clean up update manager
+    if (updateManager) {
+      updateManager.destroy();
+      updateManager = null;
+    }
+    
     // Clean up Happy Service (preserving daemon/sessions for next startup)
     if (happyServiceInitialized) {
       console.log('Cleaning up Happy Service (preserving daemon/sessions)...');
@@ -2317,6 +2355,25 @@ async function bootstrap() {
     initializeHappyService().catch(err => {
       console.error('Happy Service initialization failed:', err.message);
     });
+    
+    // 9. Initialize Update Manager and check for updates (delayed)
+    updateManager = new UpdateManager(mainWindow);
+    updateManager.onStatusChange((status) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('updater:statusChanged', status);
+      }
+    });
+    console.log('Update manager initialized');
+    
+    // Delay update check to avoid blocking startup (check after 5 seconds)
+    setTimeout(() => {
+      if (updateManager && !isQuitting) {
+        console.log('Checking for updates...');
+        updateManager.checkForUpdates().catch(err => {
+          console.error('Update check failed:', err.message);
+        });
+      }
+    }, 5000);
     
   } catch (error) {
     console.error('Startup error:', error);

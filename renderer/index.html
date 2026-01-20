@@ -671,6 +671,37 @@
                   </div>
                 </div>
                 
+                <!-- Software Update -->
+                <div class="env-item" id="env-update">
+                  <div class="env-header">
+                    <span class="env-name" data-i18n="settings.softwareUpdate">Software Update</span>
+                    <span class="env-badge" id="update-badge" data-i18n="settings.upToDate">Up to Date</span>
+                  </div>
+                  <div class="env-details" id="update-details">
+                    <div class="env-row">
+                      <span class="env-label" data-i18n="settings.currentVersion">Current Version:</span>
+                      <span class="env-value" id="update-current-version">-</span>
+                    </div>
+                    <div class="env-row" id="update-new-version-row" style="display: none;">
+                      <span class="env-label" data-i18n="settings.newVersion">New Version:</span>
+                      <span class="env-value" id="update-new-version">-</span>
+                    </div>
+                    <div class="env-row" id="update-progress-row" style="display: none;">
+                      <span class="env-label" data-i18n="settings.downloadProgress">Download Progress:</span>
+                      <span class="env-value" id="update-progress-text">0%</span>
+                    </div>
+                    <div class="update-progress-bar" id="update-progress-bar" style="display: none;">
+                      <div class="update-progress-fill" id="update-progress-fill" style="width: 0%;"></div>
+                    </div>
+                  </div>
+                  <div class="env-actions" id="update-actions">
+                    <button id="btn-check-update" class="btn-primary-sm" data-i18n="settings.checkUpdate">Check for Updates</button>
+                    <button id="btn-download-update" class="btn-primary-sm" style="display: none;" data-i18n="settings.downloadUpdate">Download Update</button>
+                    <button id="btn-install-update" class="btn-primary-sm" style="display: none;" data-i18n="settings.installUpdate">Restart & Install</button>
+                    <button id="btn-skip-update" class="btn-link" style="display: none;" data-i18n="settings.skipUpdate">Later</button>
+                  </div>
+                </div>
+                
                 <!-- Setup wizard entry -->
                 <div class="env-wizard-entry">
                   <button id="btn-rerun-setup-wizard" class="btn-secondary-sm">

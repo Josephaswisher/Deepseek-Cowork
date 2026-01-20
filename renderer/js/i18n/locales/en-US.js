@@ -243,6 +243,23 @@
       serverStatus: 'Server Status',
       extensionConnections: 'Extension Connections',
       
+      // Software Update
+      softwareUpdate: 'Software Update',
+      currentVersion: 'Current Version:',
+      newVersion: 'New Version:',
+      downloadProgress: 'Download Progress:',
+      checkUpdate: 'Check for Updates',
+      downloadUpdate: 'Download Now',
+      installUpdate: 'Restart & Install',
+      skipUpdate: 'Later',
+      upToDate: 'Up to Date',
+      updateAvailable: 'Update Available',
+      downloading: 'Downloading...',
+      updateReady: 'Update Ready',
+      updateError: 'Update Error',
+      updateCheckFailed: 'Failed to check for updates',
+      downloadFailed: 'Failed to download update',
+      
       rerunWizard: 'Re-run Setup Wizard',
       rerunWizardHint: 'If you encounter configuration issues, you can re-run the setup wizard',
       partialLimited: 'Some features will be limited',
@@ -554,6 +571,10 @@
     
     // Notifications
     notifications: {
+      // Software update notifications
+      updateAvailable: 'New version v{version} available',
+      updateReady: 'Update downloaded, restart to apply',
+      
       daemonStarting: 'Starting Daemon...',
       daemonStopping: 'Stopping Daemon...',
       daemonRestarting: 'Restarting Daemon...',

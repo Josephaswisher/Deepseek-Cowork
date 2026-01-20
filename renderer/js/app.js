@@ -348,6 +348,9 @@ class BrowserControlManagerApp {
     // 更新应用版本号
     await this.updateAppVersion();
     
+    // 初始化更新 UI
+    await this.initUpdateUI();
+    
     // 初始化 SetupWizard 和 AccountSetup 模块
     this.setupWizard.init();
     this.accountSetup.init();
@@ -473,6 +476,19 @@ class BrowserControlManagerApp {
     this.claudeCodePath = document.getElementById('claude-code-path');
     this.claudeCodeActions = document.getElementById('claude-code-actions');
     this.installClaudeCodeBtn = document.getElementById('btn-install-claude-code');
+    // 软件更新
+    this.updateBadge = document.getElementById('update-badge');
+    this.updateCurrentVersion = document.getElementById('update-current-version');
+    this.updateNewVersionRow = document.getElementById('update-new-version-row');
+    this.updateNewVersion = document.getElementById('update-new-version');
+    this.updateProgressRow = document.getElementById('update-progress-row');
+    this.updateProgressText = document.getElementById('update-progress-text');
+    this.updateProgressBar = document.getElementById('update-progress-bar');
+    this.updateProgressFill = document.getElementById('update-progress-fill');
+    this.btnCheckUpdate = document.getElementById('btn-check-update');
+    this.btnDownloadUpdate = document.getElementById('btn-download-update');
+    this.btnInstallUpdate = document.getElementById('btn-install-update');
+    this.btnSkipUpdate = document.getElementById('btn-skip-update');
     // 设置向导入口
     this.rerunSetupWizardBtn = document.getElementById('btn-rerun-setup-wizard');
     
@@ -684,6 +700,12 @@ class BrowserControlManagerApp {
     
     // 设置向导入口
     this.rerunSetupWizardBtn?.addEventListener('click', () => this.rerunSetupWizard());
+    
+    // 软件更新按钮事件
+    this.btnCheckUpdate?.addEventListener('click', () => this.checkForUpdates());
+    this.btnDownloadUpdate?.addEventListener('click', () => this.downloadUpdate());
+    this.btnInstallUpdate?.addEventListener('click', () => this.quitAndInstall());
+    this.btnSkipUpdate?.addEventListener('click', () => this.skipUpdate());
 
     // Daemon 控制按钮事件
     this.btnDaemonStart?.addEventListener('click', () => this.startDaemon());
@@ -928,6 +950,51 @@ class BrowserControlManagerApp {
       }
     });
     if (unsubHappyInitialized) this.unsubscribers.push(unsubHappyInitialized);
+    
+    // ============ 软件更新事件监听 ============
+    
+    // 监听更新检查中
+    const unsubUpdateChecking = window.browserControlManager.onUpdateChecking?.(() => {
+      this.updateUpdateUI({ status: 'checking' });
+    });
+    if (unsubUpdateChecking) this.unsubscribers.push(unsubUpdateChecking);
+    
+    // 监听有新版本可用
+    const unsubUpdateAvailable = window.browserControlManager.onUpdateAvailable?.((data) => {
+      console.log('[Update] New version available:', data.version);
+      this.updateUpdateUI({ status: 'available', updateInfo: data });
+      const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
+      this.showNotification(t('notifications.updateAvailable', { version: data.version }), 'info');
+    });
+    if (unsubUpdateAvailable) this.unsubscribers.push(unsubUpdateAvailable);
+    
+    // 监听无更新
+    const unsubUpdateNotAvailable = window.browserControlManager.onUpdateNotAvailable?.((data) => {
+      this.updateUpdateUI({ status: 'not-available', updateInfo: data });
+    });
+    if (unsubUpdateNotAvailable) this.unsubscribers.push(unsubUpdateNotAvailable);
+    
+    // 监听下载进度
+    const unsubUpdateProgress = window.browserControlManager.onUpdateDownloadProgress?.((data) => {
+      this.updateUpdateUI({ status: 'downloading', downloadProgress: data });
+    });
+    if (unsubUpdateProgress) this.unsubscribers.push(unsubUpdateProgress);
+    
+    // 监听下载完成
+    const unsubUpdateDownloaded = window.browserControlManager.onUpdateDownloaded?.((data) => {
+      console.log('[Update] Download complete:', data.version);
+      this.updateUpdateUI({ status: 'downloaded', updateInfo: data });
+      const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
+      this.showNotification(t('notifications.updateReady'), 'success');
+    });
+    if (unsubUpdateDownloaded) this.unsubscribers.push(unsubUpdateDownloaded);
+    
+    // 监听更新错误
+    const unsubUpdateError = window.browserControlManager.onUpdateError?.((data) => {
+      console.error('[Update] Error:', data.message);
+      this.updateUpdateUI({ status: 'error', error: data });
+    });
+    if (unsubUpdateError) this.unsubscribers.push(unsubUpdateError);
   }
   
   /**
@@ -1780,6 +1847,174 @@ handleKeyDown(e) {
    */
   updateHappyCoderUI(happyCoder) {
     this.dependencyChecker?.updateHappyCoderUI(happyCoder);
+  }
+
+  // ============ 软件更新方法 ============
+
+  /**
+   * 初始化更新 UI（显示当前版本）
+   */
+  async initUpdateUI() {
+    try {
+      const versionInfo = await window.browserControlManager?.getAppVersion();
+      if (versionInfo && this.updateCurrentVersion) {
+        this.updateCurrentVersion.textContent = `v${versionInfo.version}`;
+      }
+    } catch (error) {
+      console.error('[Update] Failed to get app version:', error);
+    }
+  }
+
+  /**
+   * 检查更新
+   */
+  async checkForUpdates() {
+    const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
+    
+    try {
+      this.updateUpdateUI({ status: 'checking' });
+      
+      const result = await window.browserControlManager?.checkForUpdates();
+      
+      if (!result?.success) {
+        this.updateUpdateUI({ status: 'error', error: { message: result?.error || t('settings.updateCheckFailed') } });
+      }
+    } catch (error) {
+      console.error('[Update] Check failed:', error);
+      this.updateUpdateUI({ status: 'error', error: { message: error.message } });
+    }
+  }
+
+  /**
+   * 下载更新
+   */
+  async downloadUpdate() {
+    try {
+      this.updateUpdateUI({ status: 'downloading', downloadProgress: { percent: 0 } });
+      
+      const result = await window.browserControlManager?.downloadUpdate();
+      
+      if (!result?.success) {
+        const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
+        this.updateUpdateUI({ status: 'error', error: { message: result?.error || t('settings.downloadFailed') } });
+      }
+    } catch (error) {
+      console.error('[Update] Download failed:', error);
+      this.updateUpdateUI({ status: 'error', error: { message: error.message } });
+    }
+  }
+
+  /**
+   * 退出并安装更新
+   */
+  quitAndInstall() {
+    try {
+      window.browserControlManager?.quitAndInstall();
+    } catch (error) {
+      console.error('[Update] Quit and install failed:', error);
+    }
+  }
+
+  /**
+   * 跳过更新（稍后提醒）
+   */
+  skipUpdate() {
+    this.updateUpdateUI({ status: 'idle' });
+    // 隐藏下载和跳过按钮
+    if (this.btnDownloadUpdate) this.btnDownloadUpdate.style.display = 'none';
+    if (this.btnSkipUpdate) this.btnSkipUpdate.style.display = 'none';
+    if (this.btnCheckUpdate) this.btnCheckUpdate.style.display = '';
+  }
+
+  /**
+   * 更新更新 UI 显示
+   * @param {Object} data 状态数据 { status, updateInfo?, downloadProgress?, error? }
+   */
+  updateUpdateUI(data) {
+    const { status, updateInfo, downloadProgress, error } = data;
+    const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
+    
+    // 更新徽章
+    if (this.updateBadge) {
+      // 移除所有状态类
+      this.updateBadge.classList.remove('installed', 'update-available', 'update-downloading', 'update-ready', 'update-error');
+      
+      switch (status) {
+        case 'checking':
+          this.updateBadge.textContent = t('settings.checking');
+          break;
+        case 'available':
+          this.updateBadge.classList.add('update-available');
+          this.updateBadge.textContent = t('settings.updateAvailable');
+          break;
+        case 'not-available':
+          this.updateBadge.classList.add('installed');
+          this.updateBadge.textContent = t('settings.upToDate');
+          break;
+        case 'downloading':
+          this.updateBadge.classList.add('update-downloading');
+          this.updateBadge.textContent = t('settings.downloading');
+          break;
+        case 'downloaded':
+          this.updateBadge.classList.add('update-ready');
+          this.updateBadge.textContent = t('settings.updateReady');
+          break;
+        case 'error':
+          this.updateBadge.classList.add('update-error');
+          this.updateBadge.textContent = t('settings.updateError');
+          break;
+        default:
+          this.updateBadge.classList.add('installed');
+          this.updateBadge.textContent = t('settings.upToDate');
+      }
+    }
+    
+    // 更新新版本信息
+    if (this.updateNewVersionRow && this.updateNewVersion) {
+      if (updateInfo?.version && (status === 'available' || status === 'downloading' || status === 'downloaded')) {
+        this.updateNewVersionRow.style.display = '';
+        this.updateNewVersion.textContent = `v${updateInfo.version}`;
+      } else {
+        this.updateNewVersionRow.style.display = 'none';
+      }
+    }
+    
+    // 更新下载进度
+    if (this.updateProgressRow && this.updateProgressText && this.updateProgressBar && this.updateProgressFill) {
+      if (status === 'downloading' && downloadProgress) {
+        this.updateProgressRow.style.display = '';
+        this.updateProgressBar.style.display = '';
+        const percent = Math.round(downloadProgress.percent || 0);
+        this.updateProgressText.textContent = `${percent}%`;
+        this.updateProgressFill.style.width = `${percent}%`;
+      } else {
+        this.updateProgressRow.style.display = 'none';
+        this.updateProgressBar.style.display = 'none';
+      }
+    }
+    
+    // 更新按钮显示
+    if (this.btnCheckUpdate) {
+      this.btnCheckUpdate.style.display = (status === 'idle' || status === 'not-available' || status === 'error') ? '' : 'none';
+      this.btnCheckUpdate.disabled = status === 'checking';
+      if (status === 'checking') {
+        this.btnCheckUpdate.textContent = t('settings.checking');
+      } else {
+        this.btnCheckUpdate.textContent = t('settings.checkUpdate');
+      }
+    }
+    
+    if (this.btnDownloadUpdate) {
+      this.btnDownloadUpdate.style.display = status === 'available' ? '' : 'none';
+    }
+    
+    if (this.btnInstallUpdate) {
+      this.btnInstallUpdate.style.display = status === 'downloaded' ? '' : 'none';
+    }
+    
+    if (this.btnSkipUpdate) {
+      this.btnSkipUpdate.style.display = status === 'available' ? '' : 'none';
+    }
   }
 
   // ============ Daemon 管理方法 ============
