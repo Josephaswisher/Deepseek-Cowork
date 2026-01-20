@@ -530,12 +530,60 @@ function createBrowserControlManagerPolyfill() {
         hasHappySecret: createApiMethod('hasSecret'),  // 别名
         generateSecret: createApiMethod('generateSecret'),
         generateHappySecret: createApiMethod('generateSecret'),  // 别名
-        validateSecret: createApiMethod('validateSecret'),
-        validateHappySecret: createApiMethod('validateSecret'),  // 别名
-        verifySecret: createApiMethod('verifySecret'),
-        verifyHappySecret: createApiMethod('verifySecret'),  // 别名
-        saveSecret: createApiMethod('saveSecret'),
-        saveHappySecret: createApiMethod('saveSecret'),  // 别名
+        validateSecret: async (secret) => {
+            if (!window.apiAdapter || !window.apiAdapter.isConnected()) {
+                return { valid: false, error: 'Not connected' };
+            }
+            try {
+                const response = await fetch(`${window.apiAdapter._baseUrl}/api/account/validateSecret`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret })
+                });
+                return await response.json();
+            } catch (error) {
+                return { valid: false, error: error.message };
+            }
+        },
+        validateHappySecret: async (secret) => window.browserControlManager.validateSecret(secret),
+        verifySecret: async (secret) => {
+            if (!window.apiAdapter || !window.apiAdapter.isConnected()) {
+                return { success: false, error: 'Not connected' };
+            }
+            try {
+                const response = await fetch(`${window.apiAdapter._baseUrl}/api/account/verifySecret`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret })
+                });
+                return await response.json();
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        },
+        verifyHappySecret: async (secret) => window.browserControlManager.verifySecret(secret),
+        saveSecret: async (secret, token) => {
+            if (!window.apiAdapter || !window.apiAdapter.isConnected()) {
+                console.warn('[Polyfill] saveSecret: Not connected');
+                return { success: false, error: 'Not connected' };
+            }
+            try {
+                // 后端期望 { secret, token } 格式
+                const response = await fetch(`${window.apiAdapter._baseUrl}/api/account/secret`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret, token })
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('[Polyfill] saveSecret failed:', error);
+                return { success: false, error: error.message };
+            }
+        },
+        saveHappySecret: async (secret, token) => {
+            // 调用 saveSecret
+            return window.browserControlManager.saveSecret(secret, token);
+        },
         logout: createApiMethod('logout'),
         changeServer: createApiMethod('changeServer'),
         getFormattedSecret: createApiMethod('getFormattedSecret'),
