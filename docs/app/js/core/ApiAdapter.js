@@ -231,13 +231,20 @@ class ApiAdapter {
             return true;
         }
 
+        // 确保 baseUrl 已设置
+        const baseUrl = this._baseUrl || 'http://localhost:3333';
+        
         try {
-            const response = await fetch(`${this._baseUrl}/api/ping`, {
+            const response = await fetch(`${baseUrl}/api/ping`, {
                 method: 'GET',
                 signal: AbortSignal.timeout(3000)
             });
             
             if (response.ok) {
+                // 如果连接成功，设置 baseUrl
+                if (!this._baseUrl) {
+                    this._baseUrl = baseUrl;
+                }
                 this._connectionStatus = 'connected';
                 return true;
             }
@@ -331,10 +338,28 @@ class ApiAdapter {
         
         // 发送请求
         const response = await fetch(url, options);
-        const data = await response.json();
+        
+        // 处理非 JSON 响应（如 404 页面返回 HTML）
+        let data;
+        try {
+            const text = await response.text();
+            data = text ? JSON.parse(text) : null;
+        } catch (parseError) {
+            // JSON 解析失败，可能是 404 返回的 HTML
+            if (response.status === 404) {
+                console.warn(`[ApiAdapter] API not found: ${method} (${path})`);
+                return null;
+            }
+            throw new Error(`Invalid JSON response: ${parseError.message}`);
+        }
         
         if (!response.ok) {
-            throw new Error(data.error || `HTTP ${response.status}`);
+            // 404 错误返回 null 而不是抛出异常
+            if (response.status === 404) {
+                console.warn(`[ApiAdapter] API not found: ${method} (${path})`);
+                return null;
+            }
+            throw new Error(data?.error || `HTTP ${response.status}`);
         }
         
         return data;
