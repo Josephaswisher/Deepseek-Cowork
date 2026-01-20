@@ -89,7 +89,7 @@ class FilesPanel {
     
     // 获取工作区根目录
     try {
-      const settings = await (window.apiAdapter || window.browserControlManager)?.getAllHappySettings?.();
+      const settings = await window.browserControlManager?.getAllHappySettings?.();
       if (settings?.workspaceDir) {
         this.workspaceRoot = settings.workspaceDir;
         this.currentPath = this.workspaceRoot;
@@ -201,7 +201,7 @@ class FilesPanel {
     this.showLoading();
     
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.listDirectory?.(dirPath);
+      const result = await window.browserControlManager?.listDirectory?.(dirPath);
       
       if (result?.success) {
         this.currentPath = result.path;
@@ -517,7 +517,7 @@ class FilesPanel {
         // 用系统程序打开文件
         const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
         try {
-          const result = await (window.apiAdapter || window.browserControlManager)?.openFile?.(item.path);
+          const result = await window.browserControlManager?.openFile?.(item.path);
           if (!result?.success) {
             this.showNotification(result?.error || t('notifications.cannotOpenFile'), 'error');
           }
@@ -609,7 +609,7 @@ class FilesPanel {
         break;
       case 'openWith':
         try {
-          await (window.apiAdapter || window.browserControlManager)?.openFile?.(item.path);
+          await window.browserControlManager?.openFile?.(item.path);
         } catch (error) {
           this.showNotification(t('notifications.openFailed') + ': ' + error.message, 'error');
         }
@@ -619,7 +619,7 @@ class FilesPanel {
         break;
       case 'showInExplorer':
         try {
-          await (window.apiAdapter || window.browserControlManager)?.showInExplorer?.(item.path);
+          await window.browserControlManager?.showInExplorer?.(item.path);
         } catch (error) {
           this.showNotification(t('notifications.operationFailed') + ': ' + error.message, 'error');
         }
@@ -637,7 +637,7 @@ class FilesPanel {
   async deleteItem(item) {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.deleteItem?.(item.path);
+      const result = await window.browserControlManager?.deleteItem?.(item.path);
       
       if (result?.success) {
         this.showNotification(t('notifications.deleteSuccess'), 'success');
@@ -766,7 +766,7 @@ class FilesPanel {
     
     try {
       const folderPath = this.joinPath(this.currentPath, name);
-      const result = await (window.apiAdapter || window.browserControlManager)?.createFolder?.(folderPath);
+      const result = await window.browserControlManager?.createFolder?.(folderPath);
       
       if (result?.success) {
         this.hideNewFolderDialog();
@@ -871,7 +871,7 @@ class FilesPanel {
       parts.pop();
       const newPath = parts.join(separator) + separator + newName;
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.renameItem?.(item.path, newPath);
+      const result = await window.browserControlManager?.renameItem?.(item.path, newPath);
       
       if (result?.success) {
         this.hideRenameDialog();

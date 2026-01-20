@@ -852,7 +852,7 @@ class BrowserControlManagerApp {
    */
   setupEventListeners() {
     // Check if API is available
-    if (typeof (window.apiAdapter || window.browserControlManager) === 'undefined') {
+    if (typeof window.browserControlManager === 'undefined') {
       console.error('browserControlManager API not available');
       return;
     }
@@ -860,13 +860,13 @@ class BrowserControlManagerApp {
     // ============ Happy AI 实时事件监听 ============
     
     // 监听 Happy AI 消息
-    const unsubHappyMessage = (window.apiAdapter || window.browserControlManager).onHappyMessage?.((data) => {
+    const unsubHappyMessage = window.browserControlManager.onHappyMessage?.((data) => {
       this.handleHappyMessage(data);
     });
     if (unsubHappyMessage) this.unsubscribers.push(unsubHappyMessage);
     
     // 监听 Happy AI 连接状态
-    const unsubHappyConnected = (window.apiAdapter || window.browserControlManager).onHappyConnected?.(async (data) => {
+    const unsubHappyConnected = window.browserControlManager.onHappyConnected?.(async (data) => {
       console.log('Happy AI connected:', data);
       this.aiConnected = true;
       this.currentSessionId = data.sessionId;
@@ -884,7 +884,7 @@ class BrowserControlManagerApp {
     if (unsubHappyConnected) this.unsubscribers.push(unsubHappyConnected);
     
     // 监听 Happy AI 断开连接
-    const unsubHappyDisconnected = (window.apiAdapter || window.browserControlManager).onHappyDisconnected?.((data) => {
+    const unsubHappyDisconnected = window.browserControlManager.onHappyDisconnected?.((data) => {
       console.log('Happy AI disconnected:', data);
       this.aiConnected = false;
       this.updateAIStatus({ isConnected: false });
@@ -894,13 +894,13 @@ class BrowserControlManagerApp {
     if (unsubHappyDisconnected) this.unsubscribers.push(unsubHappyDisconnected);
     
     // 监听 Happy AI 事件状态
-    const unsubHappyEventStatus = (window.apiAdapter || window.browserControlManager).onHappyEventStatus?.((data) => {
+    const unsubHappyEventStatus = window.browserControlManager.onHappyEventStatus?.((data) => {
       this.updateHappyEventStatus(data.eventType);
     });
     if (unsubHappyEventStatus) this.unsubscribers.push(unsubHappyEventStatus);
     
     // 监听 Happy AI 错误
-    const unsubHappyError = (window.apiAdapter || window.browserControlManager).onHappyError?.((data) => {
+    const unsubHappyError = window.browserControlManager.onHappyError?.((data) => {
       console.error('Happy AI error:', data);
       const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
       this.addAIMessage('system', `${t('chat.agentError')}: ${data.message}`);
@@ -908,14 +908,14 @@ class BrowserControlManagerApp {
     if (unsubHappyError) this.unsubscribers.push(unsubHappyError);
     
     // 监听 Happy AI 使用量更新（上下文窗口使用情况）
-    const unsubUsageUpdate = (window.apiAdapter || window.browserControlManager).onUsageUpdate?.((data) => {
+    const unsubUsageUpdate = window.browserControlManager.onUsageUpdate?.((data) => {
       console.log('[Usage Update]', data);
       this.updateUsageDisplay(data);
     });
     if (unsubUsageUpdate) this.unsubscribers.push(unsubUsageUpdate);
     
     // 监听消息恢复完成事件（从记忆系统恢复历史对话后刷新界面）
-    const unsubMessagesRestored = (window.apiAdapter || window.browserControlManager).onHappyMessagesRestored?.(async (data) => {
+    const unsubMessagesRestored = window.browserControlManager.onHappyMessagesRestored?.(async (data) => {
       console.log('[MessagesRestored] Restored messages:', data);
       // 清空当前显示并重新加载
       this.clearAIMessages();
@@ -928,14 +928,14 @@ class BrowserControlManagerApp {
     if (unsubMessagesRestored) this.unsubscribers.push(unsubMessagesRestored);
     
     // 监听 daemon 状态变化
-    const unsubDaemonStatus = (window.apiAdapter || window.browserControlManager).onDaemonStatusChanged?.((data) => {
+    const unsubDaemonStatus = window.browserControlManager.onDaemonStatusChanged?.((data) => {
       console.log('Daemon status changed:', data);
       this.updateDaemonUI(data);
     });
     if (unsubDaemonStatus) this.unsubscribers.push(unsubDaemonStatus);
     
     // 监听 Happy Service 热初始化完成事件（首次登录热初始化）
-    const unsubHappyInitialized = (window.apiAdapter || window.browserControlManager).onHappyInitialized?.(async (data) => {
+    const unsubHappyInitialized = window.browserControlManager.onHappyInitialized?.(async (data) => {
       console.log('[HappyInitialized] Hot initialization completed:', data);
       if (data.success) {
         // 刷新账户信息
@@ -954,13 +954,13 @@ class BrowserControlManagerApp {
     // ============ 软件更新事件监听 ============
     
     // 监听更新检查中
-    const unsubUpdateChecking = (window.apiAdapter || window.browserControlManager).onUpdateChecking?.(() => {
+    const unsubUpdateChecking = window.browserControlManager.onUpdateChecking?.(() => {
       this.updateUpdateUI({ status: 'checking' });
     });
     if (unsubUpdateChecking) this.unsubscribers.push(unsubUpdateChecking);
     
     // 监听有新版本可用
-    const unsubUpdateAvailable = (window.apiAdapter || window.browserControlManager).onUpdateAvailable?.((data) => {
+    const unsubUpdateAvailable = window.browserControlManager.onUpdateAvailable?.((data) => {
       console.log('[Update] New version available:', data.version);
       this.updateUpdateUI({ status: 'available', updateInfo: data });
       const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
@@ -969,19 +969,19 @@ class BrowserControlManagerApp {
     if (unsubUpdateAvailable) this.unsubscribers.push(unsubUpdateAvailable);
     
     // 监听无更新
-    const unsubUpdateNotAvailable = (window.apiAdapter || window.browserControlManager).onUpdateNotAvailable?.((data) => {
+    const unsubUpdateNotAvailable = window.browserControlManager.onUpdateNotAvailable?.((data) => {
       this.updateUpdateUI({ status: 'not-available', updateInfo: data });
     });
     if (unsubUpdateNotAvailable) this.unsubscribers.push(unsubUpdateNotAvailable);
     
     // 监听下载进度
-    const unsubUpdateProgress = (window.apiAdapter || window.browserControlManager).onUpdateDownloadProgress?.((data) => {
+    const unsubUpdateProgress = window.browserControlManager.onUpdateDownloadProgress?.((data) => {
       this.updateUpdateUI({ status: 'downloading', downloadProgress: data });
     });
     if (unsubUpdateProgress) this.unsubscribers.push(unsubUpdateProgress);
     
     // 监听下载完成
-    const unsubUpdateDownloaded = (window.apiAdapter || window.browserControlManager).onUpdateDownloaded?.((data) => {
+    const unsubUpdateDownloaded = window.browserControlManager.onUpdateDownloaded?.((data) => {
       console.log('[Update] Download complete:', data.version);
       this.updateUpdateUI({ status: 'downloaded', updateInfo: data });
       const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
@@ -990,7 +990,7 @@ class BrowserControlManagerApp {
     if (unsubUpdateDownloaded) this.unsubscribers.push(unsubUpdateDownloaded);
     
     // 监听更新错误
-    const unsubUpdateError = (window.apiAdapter || window.browserControlManager).onUpdateError?.((data) => {
+    const unsubUpdateError = window.browserControlManager.onUpdateError?.((data) => {
       console.error('[Update] Error:', data.message);
       this.updateUpdateUI({ status: 'error', error: data });
     });
@@ -1038,7 +1038,7 @@ class BrowserControlManagerApp {
         this.aiAbortBtn.classList.add('aborting');
       }
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.abortSession?.(this.currentSessionId);
+      const result = await window.browserControlManager?.abortSession?.(this.currentSessionId);
       
       if (result?.success) {
         this.addAIMessage('system', t('chat.taskAborted'));
@@ -1312,8 +1312,8 @@ class BrowserControlManagerApp {
    */
   async updateAppVersion() {
     try {
-      if (this.productVersion && (window.apiAdapter || window.browserControlManager)) {
-        const versionInfo = await (window.apiAdapter || window.browserControlManager).getAppVersion();
+      if (this.productVersion && window.browserControlManager) {
+        const versionInfo = await window.browserControlManager.getAppVersion();
         if (versionInfo && versionInfo.version) {
           this.productVersion.textContent = `V${versionInfo.version}`;
         }
@@ -1649,7 +1649,7 @@ class BrowserControlManagerApp {
    */
   async clearLogs() {
     await this.logViewer.clear(async () => {
-      await (window.apiAdapter || window.browserControlManager).clearServerLogs?.();
+      await window.browserControlManager.clearServerLogs?.();
     });
   }
 
@@ -1856,7 +1856,7 @@ handleKeyDown(e) {
    */
   async initUpdateUI() {
     try {
-      const versionInfo = await (window.apiAdapter || window.browserControlManager)?.getAppVersion();
+      const versionInfo = await window.browserControlManager?.getAppVersion();
       if (versionInfo && this.updateCurrentVersion) {
         this.updateCurrentVersion.textContent = `v${versionInfo.version}`;
       }
@@ -1874,7 +1874,7 @@ handleKeyDown(e) {
     try {
       this.updateUpdateUI({ status: 'checking' });
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.checkForUpdates();
+      const result = await window.browserControlManager?.checkForUpdates();
       
       if (!result?.success) {
         this.updateUpdateUI({ status: 'error', error: { message: result?.error || t('settings.updateCheckFailed') } });
@@ -1892,7 +1892,7 @@ handleKeyDown(e) {
     try {
       this.updateUpdateUI({ status: 'downloading', downloadProgress: { percent: 0 } });
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.downloadUpdate();
+      const result = await window.browserControlManager?.downloadUpdate();
       
       if (!result?.success) {
         const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
@@ -1909,7 +1909,7 @@ handleKeyDown(e) {
    */
   quitAndInstall() {
     try {
-      (window.apiAdapter || window.browserControlManager)?.quitAndInstall();
+      window.browserControlManager?.quitAndInstall();
     } catch (error) {
       console.error('[Update] Quit and install failed:', error);
     }
@@ -2042,7 +2042,7 @@ handleKeyDown(e) {
    */
   async updateDaemonClaudeCodeStatus() {
     try {
-      const settings = await (window.apiAdapter || window.browserControlManager).getClaudeCodeSettings();
+      const settings = await window.browserControlManager.getClaudeCodeSettings();
       const provider = settings?.provider || 'anthropic';
       const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
       
@@ -2268,7 +2268,7 @@ handleKeyDown(e) {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     try {
       this.showNotification(t('notifications.restartingApp'), 'info');
-      await (window.apiAdapter || window.browserControlManager).restartApp();
+      await window.browserControlManager.restartApp();
     } catch (error) {
       console.error('[restartApp] Error:', error);
       this.showNotification(t('notifications.restartFailed') + ': ' + error.message, 'error');
@@ -2282,7 +2282,7 @@ handleKeyDown(e) {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.selectWorkspaceDir?.();
+      const result = await window.browserControlManager?.selectWorkspaceDir?.();
 
       if (result?.success && result.path) {
         console.log('[selectWorkspaceDir] Selected:', result.path);
@@ -2291,7 +2291,7 @@ handleKeyDown(e) {
         this.showNotification(t('notifications.switchingWorkDir'), 'info');
         
         // 热切换工作目录
-        const switchResult = await (window.apiAdapter || window.browserControlManager)?.switchWorkDir?.(result.path);
+        const switchResult = await window.browserControlManager?.switchWorkDir?.(result.path);
 
         if (switchResult?.success) {
           // 更新显示
@@ -2336,7 +2336,7 @@ handleKeyDown(e) {
       // 显示切换中状态
       this.showNotification(t('notifications.resettingToDefault'), 'info');
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.resetWorkspaceDir?.();
+      const result = await window.browserControlManager?.resetWorkspaceDir?.();
 
       if (result?.success) {
         console.log('[resetWorkspaceDir] Reset successful');

@@ -176,7 +176,7 @@ class AccountSetup {
    */
   async loadAccountInfo() {
     try {
-      const accountInfo = await (window.apiAdapter || window.browserControlManager)?.getAccountInfo?.();
+      const accountInfo = await window.browserControlManager?.getAccountInfo?.();
       console.log('[AccountSetup] Account info:', accountInfo);
       
       this.accountInfo = accountInfo;
@@ -210,7 +210,7 @@ class AccountSetup {
       
       // 2. 生成新的 Secret
       console.log('[AccountSetup] Generating new secret...');
-      const generateResult = await (window.apiAdapter || window.browserControlManager)?.generateHappySecret?.();
+      const generateResult = await window.browserControlManager?.generateHappySecret?.();
       
       if (!generateResult?.success) {
         throw new Error(generateResult?.error || '生成 Secret 失败');
@@ -220,7 +220,7 @@ class AccountSetup {
       
       // 3. 验证 Secret（连接服务器）
       console.log('[AccountSetup] Verifying secret with server...');
-      const verifyResult = await (window.apiAdapter || window.browserControlManager)?.verifyHappySecret?.(generateResult.base64url);
+      const verifyResult = await window.browserControlManager?.verifyHappySecret?.(generateResult.base64url);
       
       if (!verifyResult?.success) {
         throw new Error(verifyResult?.error || '验证 Secret 失败');
@@ -230,7 +230,7 @@ class AccountSetup {
       
       // 4. 保存 Secret
       console.log('[AccountSetup] Saving secret...');
-      const saveResult = await (window.apiAdapter || window.browserControlManager)?.saveHappySecret?.(
+      const saveResult = await window.browserControlManager?.saveHappySecret?.(
         generateResult.base64url,
         verifyResult.token
       );
@@ -242,7 +242,7 @@ class AccountSetup {
       console.log('[AccountSetup] Secret saved successfully');
       
       // 5. 刷新账户信息并渲染已登录状态
-      const newAccountInfo = await (window.apiAdapter || window.browserControlManager)?.getAccountInfo?.();
+      const newAccountInfo = await window.browserControlManager?.getAccountInfo?.();
       this.accountInfo = newAccountInfo;
       this.renderLoggedInState(newAccountInfo);
       
@@ -387,7 +387,7 @@ class AccountSetup {
     } else {
       // 显示 Secret
       try {
-        const result = await (window.apiAdapter || window.browserControlManager)?.getFormattedSecret?.();
+        const result = await window.browserControlManager?.getFormattedSecret?.();
         
         if (result?.success) {
           if (this.elements.accountSecretDisplay) {
@@ -509,7 +509,7 @@ class AccountSetup {
         this.elements.btnChangeServerConfirm.textContent = t('common.processing');
       }
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.changeServer?.(newServer);
+      const result = await window.browserControlManager?.changeServer?.(newServer);
       
       if (result?.success) {
         this.hideChangeServerDialog();
@@ -549,7 +549,7 @@ class AccountSetup {
     }
     
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.logout?.();
+      const result = await window.browserControlManager?.logout?.();
       
       if (result?.success) {
         this.showNotification(t('notifications.loggedOut'), 'success');
@@ -616,11 +616,11 @@ class AccountSetup {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     try {
       console.log('[AccountSetup] handleCreateAccount called');
-      console.log('[AccountSetup] browserControlManager:', !!(window.apiAdapter || window.browserControlManager));
-      console.log('[AccountSetup] generateHappySecret:', !!(window.apiAdapter || window.browserControlManager)?.generateHappySecret);
+      console.log('[AccountSetup] browserControlManager:', !!window.browserControlManager);
+      console.log('[AccountSetup] generateHappySecret:', !!window.browserControlManager?.generateHappySecret);
       console.log('[AccountSetup] Generating new secret...');
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.generateHappySecret?.();
+      const result = await window.browserControlManager?.generateHappySecret?.();
       console.log('[AccountSetup] generateHappySecret result:', result);
       
       if (result?.success) {
@@ -770,7 +770,7 @@ class AccountSetup {
       // 显示通知提示用户正在处理
       this.showNotification(t('notifications.initializingAccount'), 'info');
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.saveHappySecret?.(this.pendingSecret.base64url);
+      const result = await window.browserControlManager?.saveHappySecret?.(this.pendingSecret.base64url);
       
       if (result?.success) {
         this.hideSecretBackupDialog();
@@ -856,7 +856,7 @@ class AccountSetup {
         this.elements.secretInputStatus.className = 'input-status validating';
       }
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.validateHappySecret?.(input);
+      const result = await window.browserControlManager?.validateHappySecret?.(input);
       
       if (result?.valid) {
         if (this.elements.secretInputStatus) {
@@ -913,7 +913,7 @@ class AccountSetup {
       }
       
       // 验证 Secret 有效性（连接服务器）
-      const verifyResult = await (window.apiAdapter || window.browserControlManager)?.verifyHappySecret?.(input);
+      const verifyResult = await window.browserControlManager?.verifyHappySecret?.(input);
       
       if (verifyResult?.success) {
         // 更新状态：正在初始化账户（服务启动阶段）
@@ -923,7 +923,7 @@ class AccountSetup {
         }
         
         // 保存 Secret（传递 token 以便同步到 ~/.happy/access.key）
-        const saveResult = await (window.apiAdapter || window.browserControlManager)?.saveHappySecret?.(verifyResult.normalized, verifyResult.token);
+        const saveResult = await window.browserControlManager?.saveHappySecret?.(verifyResult.normalized, verifyResult.token);
         
         if (saveResult?.success) {
           this.hideSecretInputDialog();

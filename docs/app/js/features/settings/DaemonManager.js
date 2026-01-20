@@ -67,7 +67,7 @@ class DaemonManager {
   async loadStatus() {
     try {
       console.log('[DaemonManager] Loading status...');
-      const status = await (window.apiAdapter || window.browserControlManager)?.getDaemonStatus?.();
+      const status = await window.browserControlManager?.getDaemonStatus?.();
       
       if (status) {
         this.updateUI(status);
@@ -153,7 +153,7 @@ class DaemonManager {
         this.elements.statusDot.className = 'daemon-status-dot starting';
       }
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.startDaemon?.();
+      const result = await window.browserControlManager?.startDaemon?.();
       
       if (result?.success) {
         NotificationManager?.success?.(t('notifications.daemonStarted'));
@@ -190,7 +190,7 @@ class DaemonManager {
         this.elements.statusDot.className = 'daemon-status-dot stopping';
       }
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.stopDaemon?.();
+      const result = await window.browserControlManager?.stopDaemon?.();
       
       if (result?.success) {
         NotificationManager?.success?.(t('notifications.daemonStopped'));
@@ -225,7 +225,7 @@ class DaemonManager {
         this.elements.statusDot.className = 'daemon-status-dot starting';
       }
       
-      const result = await (window.apiAdapter || window.browserControlManager)?.restartDaemon?.();
+      const result = await window.browserControlManager?.restartDaemon?.();
       
       if (result?.success) {
         NotificationManager?.success?.(t('notifications.daemonRestarted'));

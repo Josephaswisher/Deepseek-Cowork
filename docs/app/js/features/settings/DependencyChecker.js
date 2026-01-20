@@ -72,7 +72,7 @@ class DependencyChecker {
   async load() {
     try {
       console.log('[DependencyChecker] Loading...');
-      const status = await (window.apiAdapter || window.browserControlManager).getDependencyStatus();
+      const status = await window.browserControlManager.getDependencyStatus();
       console.log('[DependencyChecker] Status:', status);
       
       this.nodejs = status.nodejs;
@@ -99,7 +99,7 @@ class DependencyChecker {
         this.elements.refreshBtn.disabled = true;
       }
       
-      const status = await (window.apiAdapter || window.browserControlManager).checkAllDependencies();
+      const status = await window.browserControlManager.checkAllDependencies();
       
       this.nodejs = status.nodejs;
       this.happyCoder = status.happyCoder;
@@ -258,7 +258,7 @@ class DependencyChecker {
    */
   async openNodeJsGuide() {
     try {
-      await (window.apiAdapter || window.browserControlManager).openNodeJsWebsite();
+      await window.browserControlManager.openNodeJsWebsite();
     } catch (error) {
       console.error('[DependencyChecker] Open Node.js guide error:', error);
     }
@@ -269,7 +269,7 @@ class DependencyChecker {
    */
   async openClaudeCodeGuide() {
     try {
-      await (window.apiAdapter || window.browserControlManager).openClaudeCodeDocs();
+      await window.browserControlManager.openClaudeCodeDocs();
     } catch (error) {
       console.error('[DependencyChecker] Open Claude Code guide error:', error);
     }

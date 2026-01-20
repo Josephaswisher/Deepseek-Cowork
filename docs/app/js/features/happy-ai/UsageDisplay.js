@@ -44,7 +44,7 @@ class UsageDisplay {
    */
   async loadModelConfig() {
     try {
-      const settings = await (window.apiAdapter || window.browserControlManager)?.getClaudeCodeSettings?.();
+      const settings = await window.browserControlManager?.getClaudeCodeSettings?.();
       if (settings) {
         this.currentProvider = settings.provider || 'deepseek';
         this.currentModel = settings.model || null;

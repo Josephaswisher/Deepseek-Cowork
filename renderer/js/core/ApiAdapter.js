@@ -89,10 +89,19 @@ const API_MAPPING = {
     'getWorkspaceSettings': { method: 'GET', path: '/api/settings/workspace' },
     'setWorkspaceDir': { method: 'PUT', path: '/api/settings/workspace' },
     'resetWorkspaceDir': { method: 'DELETE', path: '/api/settings/workspace' },
+    'selectWorkspaceDir': { method: 'PUT', path: '/api/settings/workspace' },
     'getWorkDirs': { method: 'GET', path: '/api/settings/workdirs' },
     'getClaudeSettings': { method: 'GET', path: '/api/settings/claude' },
+    'getClaudeCodeSettings': { method: 'GET', path: '/api/settings/claude' },
     'saveClaudeSettings': { method: 'PUT', path: '/api/settings/claude' },
+    'saveClaudeCodeSettings': { method: 'PUT', path: '/api/settings/claude' },
     'getClaudePresets': { method: 'GET', path: '/api/settings/claude/presets' },
+    'getClaudeCodePresets': { method: 'GET', path: '/api/settings/claude/presets' },
+    'setClaudeAuthToken': { method: 'PUT', path: '/api/settings/claude' },
+    'deleteClaudeAuthToken': { method: 'PUT', path: '/api/settings/claude' },
+    'getDependencyStatus': { method: 'GET', path: '/api/status' },
+    'checkAllDependencies': { method: 'GET', path: '/api/status' },
+    'clearLogs': { method: 'DELETE', path: '/api/logs' },
     
     // 浏览器控制
     'getTabs': { method: 'GET', path: '/api/browser/tabs' },
@@ -373,3 +382,171 @@ const apiAdapter = new ApiAdapter();
 // 导出
 window.ApiAdapter = ApiAdapter;
 window.apiAdapter = apiAdapter;
+
+/**
+ * Web 模式下的 browserControlManager 兼容层
+ * 将 IPC 调用转换为 HTTP/WebSocket 调用
+ */
+function createBrowserControlManagerPolyfill() {
+    const eventHandlers = new Map();
+    
+    // 创建事件监听方法
+    function createEventListener(eventName) {
+        return function(callback) {
+            if (!eventHandlers.has(eventName)) {
+                eventHandlers.set(eventName, new Set());
+            }
+            eventHandlers.get(eventName).add(callback);
+            
+            // 通过 WebSocket 监听事件
+            if (window.apiAdapter) {
+                window.apiAdapter.on(eventName, callback);
+            }
+            
+            // 返回取消订阅函数
+            return () => {
+                eventHandlers.get(eventName)?.delete(callback);
+                if (window.apiAdapter) {
+                    window.apiAdapter.off(eventName, callback);
+                }
+            };
+        };
+    }
+    
+    // 创建 API 调用方法
+    function createApiMethod(methodName) {
+        return async function(...args) {
+            if (!window.apiAdapter || !window.apiAdapter.isConnected()) {
+                console.warn(`[Polyfill] ${methodName}: Not connected`);
+                return null;
+            }
+            try {
+                return await window.apiAdapter.call(methodName, ...args);
+            } catch (error) {
+                console.error(`[Polyfill] ${methodName} failed:`, error);
+                throw error;
+            }
+        };
+    }
+    
+    return {
+        // ========== 服务器状态 ==========
+        getServerStatus: createApiMethod('getServerStatus'),
+        getDetailedStatus: createApiMethod('getDetailedStatus'),
+        
+        // ========== AI 相关 ==========
+        getAiStatus: createApiMethod('getAiStatus'),
+        connectAi: createApiMethod('connectAi'),
+        disconnectAi: createApiMethod('disconnectAi'),
+        sendAiMessage: createApiMethod('sendMessage'),
+        getAiMessages: createApiMethod('getMessages'),
+        clearAiMessages: createApiMethod('clearMessages'),
+        restoreAiMessages: createApiMethod('restoreMessages'),
+        getAiUsage: createApiMethod('getLatestUsage'),
+        allowAiPermission: createApiMethod('allowPermission'),
+        denyAiPermission: createApiMethod('denyPermission'),
+        abortAi: createApiMethod('abortSession'),
+        getAllSessions: createApiMethod('getAllSessions'),
+        getSessionId: createApiMethod('getSessionId'),
+        reconnectSession: createApiMethod('reconnectSession'),
+        
+        // ========== 账户相关 ==========
+        getAccountInfo: createApiMethod('getAccountInfo'),
+        hasSecret: createApiMethod('hasSecret'),
+        generateSecret: createApiMethod('generateSecret'),
+        validateSecret: createApiMethod('validateSecret'),
+        verifySecret: createApiMethod('verifySecret'),
+        saveSecret: createApiMethod('saveSecret'),
+        logout: createApiMethod('logout'),
+        changeServer: createApiMethod('changeServer'),
+        getFormattedSecret: createApiMethod('getFormattedSecret'),
+        
+        // ========== 文件系统 ==========
+        getWorkspaceRoot: createApiMethod('getWorkspaceRoot'),
+        listDirectory: createApiMethod('listDirectory'),
+        createFolder: createApiMethod('createFolder'),
+        deleteItem: createApiMethod('deleteItem'),
+        renameItem: createApiMethod('renameItem'),
+        readFileContent: createApiMethod('readFileContent'),
+        saveFileContent: createApiMethod('saveFileContent'),
+        getItemInfo: createApiMethod('getItemInfo'),
+        copyItem: createApiMethod('copyItem'),
+        moveItem: createApiMethod('moveItem'),
+        openFile: createApiMethod('openFile'),
+        showInExplorer: createApiMethod('showInExplorer'),
+        
+        // ========== Daemon 管理 ==========
+        getDaemonStatus: createApiMethod('getDaemonStatus'),
+        isDaemonRunning: createApiMethod('isDaemonRunning'),
+        startDaemon: createApiMethod('startDaemon'),
+        stopDaemon: createApiMethod('stopDaemon'),
+        restartDaemon: createApiMethod('restartDaemon'),
+        
+        // ========== 设置 ==========
+        getSettings: createApiMethod('getSettings'),
+        getSetting: createApiMethod('getSetting'),
+        setSetting: createApiMethod('setSetting'),
+        getAllHappySettings: createApiMethod('getAllHappySettings'),
+        saveHappySettings: createApiMethod('saveHappySettings'),
+        getWorkspaceSettings: createApiMethod('getWorkspaceSettings'),
+        setWorkspaceDir: createApiMethod('setWorkspaceDir'),
+        resetWorkspaceDir: createApiMethod('resetWorkspaceDir'),
+        selectWorkspaceDir: createApiMethod('selectWorkspaceDir'),
+        getWorkDirs: createApiMethod('getWorkDirs'),
+        getClaudeCodeSettings: createApiMethod('getClaudeCodeSettings'),
+        saveClaudeCodeSettings: createApiMethod('saveClaudeCodeSettings'),
+        getClaudeCodePresets: createApiMethod('getClaudeCodePresets'),
+        setClaudeAuthToken: createApiMethod('setClaudeAuthToken'),
+        deleteClaudeAuthToken: createApiMethod('deleteClaudeAuthToken'),
+        getDependencyStatus: createApiMethod('getDependencyStatus'),
+        checkAllDependencies: createApiMethod('checkAllDependencies'),
+        
+        // ========== 浏览器控制 ==========
+        getTabs: createApiMethod('getTabs'),
+        closeTab: createApiMethod('closeTab'),
+        openUrl: createApiMethod('openUrl'),
+        getExtensionStatus: createApiMethod('getExtensionStatus'),
+        
+        // ========== 应用控制 ==========
+        getAppVersion: async () => ({ version: 'Web', platform: 'web' }),
+        restartApp: () => window.location.reload(),
+        clearServerLogs: createApiMethod('clearLogs'),
+        openNodeJsWebsite: () => window.open('https://nodejs.org/', '_blank'),
+        openClaudeCodeDocs: () => window.open('https://docs.anthropic.com/claude-code', '_blank'),
+        
+        // ========== 事件监听 ==========
+        onServerStatusChanged: createEventListener('server:status'),
+        onServerLog: createEventListener('server:log'),
+        onViewLoaded: createEventListener('view:loaded'),
+        onViewLoadFailed: createEventListener('view:loadFailed'),
+        onHappyMessage: createEventListener('happy:message'),
+        onHappyConnected: createEventListener('happy:connected'),
+        onHappyDisconnected: createEventListener('happy:disconnected'),
+        onHappyEventStatus: createEventListener('happy:eventStatus'),
+        onHappyError: createEventListener('happy:error'),
+        onUsageUpdate: createEventListener('happy:usageUpdate'),
+        onHappyMessagesRestored: createEventListener('happy:messagesRestored'),
+        onDaemonStatusChanged: createEventListener('daemon:statusChanged'),
+        onHappyInitialized: createEventListener('happy:initialized'),
+        onUpdateChecking: createEventListener('update:checking'),
+        onUpdateAvailable: createEventListener('update:available'),
+        onUpdateNotAvailable: createEventListener('update:notAvailable'),
+        onUpdateDownloadProgress: createEventListener('update:downloadProgress'),
+        onUpdateDownloaded: createEventListener('update:downloaded'),
+        onUpdateError: createEventListener('update:error'),
+        onExtensionConnected: createEventListener('extension:connected'),
+        onExtensionDisconnected: createEventListener('extension:disconnected'),
+        onTabsUpdated: createEventListener('tabs:updated'),
+        
+        // 窗口控制（Web 模式下无效）
+        minimizeWindow: () => console.log('[Polyfill] minimizeWindow: Not supported in web mode'),
+        maximizeWindow: () => console.log('[Polyfill] maximizeWindow: Not supported in web mode'),
+        closeWindow: () => window.close()
+    };
+}
+
+// 在 Web 模式下创建 polyfill
+if (detectEnvironment() === 'web' && !window.browserControlManager) {
+    console.log('[ApiAdapter] Creating browserControlManager polyfill for Web mode');
+    window.browserControlManager = createBrowserControlManagerPolyfill();
+}

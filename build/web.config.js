@@ -64,13 +64,10 @@ const JS_FILES = [
 ];
 
 // Electron 相关代码的替换规则
+// 注意：大部分替换已不需要，因为 ApiAdapter.js 中的 polyfill 会在 Web 模式下
+// 自动创建 window.browserControlManager 兼容层
 const ELECTRON_REPLACEMENTS = [
-    // 移除对 window.browserControlManager 直接调用的检查（改用 ApiAdapter）
-    {
-        pattern: /window\.browserControlManager/g,
-        replacement: '(window.apiAdapter || window.browserControlManager)'
-    },
-    // 移除 Electron 专用的窗口控制代码
+    // 移除 Electron 专用的窗口控制代码（最小化、最大化、关闭按钮）
     {
         pattern: /if\s*\(\s*window\.browserControlManager\s*\)\s*\{[^}]*browserControlManager\.(minimize|maximize|close)Window[^}]*\}/g,
         replacement: '/* Electron window controls removed for web build */'

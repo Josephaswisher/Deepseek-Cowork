@@ -11,21 +11,21 @@ const WindowController = {
    * 最小化窗口
    */
   minimize() {
-    (window.apiAdapter || window.browserControlManager)?.minimizeWindow?.();
+    window.browserControlManager?.minimizeWindow?.();
   },
 
   /**
    * 最大化窗口
    */
   maximize() {
-    (window.apiAdapter || window.browserControlManager)?.maximizeWindow?.();
+    window.browserControlManager?.maximizeWindow?.();
   },
 
   /**
    * 关闭窗口
    */
   close() {
-    (window.apiAdapter || window.browserControlManager)?.closeWindow?.();
+    window.browserControlManager?.closeWindow?.();
   }
 };
 

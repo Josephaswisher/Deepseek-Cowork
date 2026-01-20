@@ -428,7 +428,7 @@ class BrowserPanel {
   async getTabHtml(tabId) {
     const t = (key) => window.I18nManager?.t(key) || key;
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.getTabHtml?.(tabId);
+      const result = await window.browserControlManager?.getTabHtml?.(tabId);
       if (result?.success) {
         this.app?.showNotification?.(t('browser.htmlRequestSent'), 'success');
       }
@@ -445,7 +445,7 @@ class BrowserPanel {
   async getTabCookies(tabId) {
     const t = (key) => window.I18nManager?.t(key) || key;
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.getTabCookies?.(tabId);
+      const result = await window.browserControlManager?.getTabCookies?.(tabId);
       if (result?.success) {
         this.app?.showNotification?.(t('browser.cookiesRequestSent'), 'success');
       }
@@ -475,7 +475,7 @@ class BrowserPanel {
   async saveCookies(tabId) {
     const t = (key) => window.I18nManager?.t(key) || key;
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.saveCookies?.(tabId);
+      const result = await window.browserControlManager?.saveCookies?.(tabId);
       if (result?.success) {
         this.app?.showNotification?.(t('browser.saveCookiesSuccess'), 'success');
       }
@@ -495,7 +495,7 @@ class BrowserPanel {
       const tab = this.tabs.find(t => t.id == tabId);
       if (!tab) return;
       
-      await (window.apiAdapter || window.browserControlManager)?.showSavedCookies?.(tabId, tab.url);
+      await window.browserControlManager?.showSavedCookies?.(tabId, tab.url);
     } catch (error) {
       console.error('[BrowserPanel] Failed to show saved cookies:', error);
     }
@@ -507,7 +507,7 @@ class BrowserPanel {
    */
   showInjectScriptModal(tabId) {
     try {
-      (window.apiAdapter || window.browserControlManager)?.showInjectScriptModal?.(tabId);
+      window.browserControlManager?.showInjectScriptModal?.(tabId);
     } catch (error) {
       console.error('[BrowserPanel] Failed to show inject script modal:', error);
     }

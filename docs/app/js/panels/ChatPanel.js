@@ -147,7 +147,7 @@ class ChatPanel {
         await this.app.loadModelConfig();
       }
       
-      const status = await (window.apiAdapter || window.browserControlManager)?.getAIStatus?.();
+      const status = await window.browserControlManager?.getAIStatus?.();
       if (status) {
         this.updateAIStatus(status);
         
@@ -166,7 +166,7 @@ class ChatPanel {
    */
   async loadHappyMessageHistory() {
     try {
-      const messages = await (window.apiAdapter || window.browserControlManager)?.getHappyMessages?.(100);
+      const messages = await window.browserControlManager?.getHappyMessages?.(100);
       
       // 先清空显示
       this.renderedMessageIds.clear();
@@ -241,7 +241,7 @@ class ChatPanel {
    */
   async loadLatestUsage() {
     try {
-      const usage = await (window.apiAdapter || window.browserControlManager)?.getLatestUsage?.();
+      const usage = await window.browserControlManager?.getLatestUsage?.();
       if (usage) {
         this.usageData = usage;
         if (this.app?.updateUsageDisplay) {
@@ -279,9 +279,9 @@ class ChatPanel {
   async toggleAIConnection() {
     try {
       if (this.aiConnected) {
-        await (window.apiAdapter || window.browserControlManager)?.disconnectAI?.();
+        await window.browserControlManager?.disconnectAI?.();
       } else {
-        await (window.apiAdapter || window.browserControlManager)?.connectAI?.();
+        await window.browserControlManager?.connectAI?.();
       }
       
       await this.checkAIStatus();
@@ -365,7 +365,7 @@ class ChatPanel {
     }, this.happyStatusTimeoutMs);
 
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.sendAIMessage?.(text);
+      const result = await window.browserControlManager?.sendAIMessage?.(text);
       
       if (!result?.success) {
         const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
@@ -391,7 +391,7 @@ class ChatPanel {
     try {
       const sessionId = this.currentSessionId || this.app?.currentSessionId;
       if (sessionId) {
-        await (window.apiAdapter || window.browserControlManager)?.abortAISession?.(sessionId);
+        await window.browserControlManager?.abortAISession?.(sessionId);
       }
       this.updateHappyEventStatus('ready');
     } catch (error) {
@@ -623,7 +623,7 @@ class ChatPanel {
     }, this.happyStatusTimeoutMs);
 
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.sendAIMessage?.(text);
+      const result = await window.browserControlManager?.sendAIMessage?.(text);
       
       if (!result?.success) {
         const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;

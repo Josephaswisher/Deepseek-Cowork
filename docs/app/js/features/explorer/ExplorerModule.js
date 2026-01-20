@@ -195,13 +195,13 @@ class ExplorerModule {
    * 设置服务器状态监听器
    */
   setupServerStatusListener() {
-    if (!(window.apiAdapter || window.browserControlManager)) {
+    if (!window.browserControlManager) {
       console.warn('[ExplorerModule] browserControlManager not available');
       return;
     }
 
     // 监听服务器状态变化
-    this.serverStatusUnsubscribe = (window.apiAdapter || window.browserControlManager).onServerStatusChanged(async (status) => {
+    this.serverStatusUnsubscribe = window.browserControlManager.onServerStatusChanged(async (status) => {
       console.log('[ExplorerModule] Server status changed:', status);
       
       if (status && status.running) {
@@ -221,14 +221,14 @@ class ExplorerModule {
    * 检查服务器状态并连接 SSE
    */
   async checkAndConnectSSE() {
-    if (!(window.apiAdapter || window.browserControlManager) || !this.explorerManager) {
+    if (!window.browserControlManager || !this.explorerManager) {
       console.warn('[ExplorerModule] browserControlManager or explorerManager not available');
       return;
     }
 
     try {
       // 检查服务器状态
-      const status = await (window.apiAdapter || window.browserControlManager).getServerStatus();
+      const status = await window.browserControlManager.getServerStatus();
       console.log('[ExplorerModule] Current server status:', status);
       
       if (status && status.running) {
@@ -618,7 +618,7 @@ class ExplorerModule {
       
       // 回退到 IPC
       if (content === null) {
-        const result = await (window.apiAdapter || window.browserControlManager)?.readFileContent?.(filePath);
+        const result = await window.browserControlManager?.readFileContent?.(filePath);
         if (result?.success) {
           content = result.content;
         } else {
@@ -1561,7 +1561,7 @@ class ExplorerModule {
       }
       
       if (!success) {
-        const result = await (window.apiAdapter || window.browserControlManager)?.saveFileContent?.(this.filePreviewPath, content);
+        const result = await window.browserControlManager?.saveFileContent?.(this.filePreviewPath, content);
         success = result?.success;
         if (!success) {
           throw new Error(result?.error || t('errors.saveFailed'));
@@ -1642,7 +1642,7 @@ class ExplorerModule {
       
       // 回退到 IPC
       if (content === null) {
-        const result = await (window.apiAdapter || window.browserControlManager)?.readFileContent?.(this.filePreviewPath);
+        const result = await window.browserControlManager?.readFileContent?.(this.filePreviewPath);
         if (result?.success) {
           content = result.content;
         } else {
@@ -1746,7 +1746,7 @@ class ExplorerModule {
       
       // 回退到 IPC
       if (content === null) {
-        const result = await (window.apiAdapter || window.browserControlManager)?.readFileContent?.(tab.path);
+        const result = await window.browserControlManager?.readFileContent?.(tab.path);
         if (result?.success) {
           content = result.content;
         } else {

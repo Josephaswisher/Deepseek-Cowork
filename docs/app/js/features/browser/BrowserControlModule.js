@@ -68,39 +68,88 @@ class BrowserControlModule {
    * 设置事件监听器
    */
   setupEventListeners() {
-    // 检查 API 是否可用
-    if (typeof (window.apiAdapter || window.browserControlManager) === 'undefined') {
-      console.error('[BrowserControlModule] browserControlManager API not available');
+    // 检查运行模式
+    const isWebMode = typeof window.browserControlManager === 'undefined';
+    
+    if (isWebMode) {
+      console.log('[BrowserControlModule] Running in Web mode, using ApiAdapter');
+      this.setupWebModeListeners();
       return;
     }
 
-    // 监听服务器状态变化
-    const unsubStatus = (window.apiAdapter || window.browserControlManager).onServerStatusChanged((data) => {
+    // Electron 模式：监听服务器状态变化
+    const unsubStatus = window.browserControlManager.onServerStatusChanged((data) => {
       console.log('[BrowserControlModule] Server status changed:', data);
       this.handleServerStatusChanged(data);
     });
     this.unsubscribers.push(unsubStatus);
 
     // 监听服务器日志
-    const unsubLog = (window.apiAdapter || window.browserControlManager).onServerLog((log) => {
+    const unsubLog = window.browserControlManager.onServerLog((log) => {
       // 委托给 app 层处理日志显示
       this.app?.appendLog?.(log);
     });
     this.unsubscribers.push(unsubLog);
 
     // 监听视图加载完成
-    const unsubViewLoaded = (window.apiAdapter || window.browserControlManager).onViewLoaded?.((data) => {
+    const unsubViewLoaded = window.browserControlManager.onViewLoaded?.((data) => {
       console.log('[BrowserControlModule] Management UI loaded:', data);
       this.app?.hideLoadingOverlay?.();
     });
     if (unsubViewLoaded) this.unsubscribers.push(unsubViewLoaded);
 
     // 监听视图加载失败
-    const unsubViewFailed = (window.apiAdapter || window.browserControlManager).onViewLoadFailed?.((data) => {
+    const unsubViewFailed = window.browserControlManager.onViewLoadFailed?.((data) => {
       console.error('[BrowserControlModule] Management UI load failed:', data);
       this.app?.showLoadingError?.(data.errorDescription);
     });
     if (unsubViewFailed) this.unsubscribers.push(unsubViewFailed);
+  }
+
+  /**
+   * Web 模式下的事件监听设置
+   */
+  setupWebModeListeners() {
+    // 初始获取服务器状态
+    this.fetchWebModeStatus();
+    
+    // 定期轮询状态（每 5 秒）
+    this._webModeStatusInterval = setInterval(() => {
+      this.fetchWebModeStatus();
+    }, 5000);
+    
+    // 监听 WebSocket 事件（如果可用）
+    if (window.apiAdapter) {
+      window.apiAdapter.on('server:status', (data) => {
+        console.log('[BrowserControlModule] WebSocket status update:', data);
+        this.handleServerStatusChanged(data);
+      });
+    }
+  }
+
+  /**
+   * Web 模式下获取服务器状态
+   */
+  async fetchWebModeStatus() {
+    if (!window.apiAdapter || !window.apiAdapter.isConnected()) {
+      // 未连接时显示停止状态
+      this.updateServerStatusDisplay({ running: false });
+      return;
+    }
+    
+    try {
+      const status = await window.apiAdapter.call('getServerStatus');
+      console.log('[BrowserControlModule] Web mode status:', status);
+      this.handleServerStatusChanged({
+        running: true,
+        httpPort: status.httpPort || 3333,
+        wsPort: status.wsPort || 8080,
+        extensionConnections: status.extensionConnections || 0
+      });
+    } catch (error) {
+      console.warn('[BrowserControlModule] Failed to fetch status:', error);
+      this.updateServerStatusDisplay({ running: false, error: true });
+    }
   }
 
   /**
@@ -342,7 +391,7 @@ class BrowserControlModule {
     this._lastTabsRefresh = now;
     
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.getTabs?.();
+      const result = await window.browserControlManager?.getTabs?.();
       
       // 兼容多种返回格式
       let tabs = [];
@@ -369,7 +418,7 @@ class BrowserControlModule {
    */
   async closeTab(tabId) {
     try {
-      await (window.apiAdapter || window.browserControlManager)?.closeTab?.(tabId);
+      await window.browserControlManager?.closeTab?.(tabId);
     } catch (error) {
       console.error('[BrowserControlModule] Failed to close tab:', error);
       throw error;

@@ -101,7 +101,7 @@ class SetupWizard {
     this.elements.next2?.addEventListener('click', () => this.goToStep(3));
     this.elements.copyCommandBtn?.addEventListener('click', () => this.copyInstallCommand());
     this.elements.openClaudeDocsBtn?.addEventListener('click', () => {
-      (window.apiAdapter || window.browserControlManager)?.openClaudeCodeDocs?.();
+      window.browserControlManager?.openClaudeCodeDocs?.();
     });
     
     // Step 3 事件
@@ -115,7 +115,7 @@ class SetupWizard {
     this.elements.skip4?.addEventListener('click', () => this.goToStep(5));
     this.elements.next4?.addEventListener('click', () => this.goToStep(5));
     this.elements.openJsEyesBtn?.addEventListener('click', () => {
-      (window.apiAdapter || window.browserControlManager)?.openExternalUrl?.('https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo/js-eyes');
+      window.browserControlManager?.openExternalUrl?.('https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo/js-eyes');
     });
     
     // Step 5 事件 (完成)
@@ -128,7 +128,7 @@ class SetupWizard {
    */
   async shouldShow() {
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.shouldShowSetup?.();
+      const result = await window.browserControlManager?.shouldShowSetup?.();
       console.log('[SetupWizard] shouldShowSetup result:', result);
       
       if (result?.shouldShow) {
@@ -147,7 +147,7 @@ class SetupWizard {
    */
   async checkAndShow() {
     try {
-      const result = await (window.apiAdapter || window.browserControlManager)?.shouldShowSetup?.();
+      const result = await window.browserControlManager?.shouldShowSetup?.();
       console.log('[SetupWizard] shouldShowSetup result:', result);
       
       if (result?.shouldShow) {
@@ -167,7 +167,7 @@ class SetupWizard {
     
     // 获取最新的配置需求
     if (!this.wizardRequirements) {
-      this.wizardRequirements = await (window.apiAdapter || window.browserControlManager)?.getSetupRequirements?.();
+      this.wizardRequirements = await window.browserControlManager?.getSetupRequirements?.();
     }
     
     // 渲染需求列表
@@ -361,7 +361,7 @@ class SetupWizard {
     
     try {
       // 重新检测
-      this.wizardRequirements = await (window.apiAdapter || window.browserControlManager)?.recheckSetup?.();
+      this.wizardRequirements = await window.browserControlManager?.recheckSetup?.();
       
       // 更新需求列表
       this.renderRequirementsList();
@@ -514,13 +514,13 @@ class SetupWizard {
       }
       
       // 保存配置
-      const result = await (window.apiAdapter || window.browserControlManager)?.saveClaudeCodeSettings?.(settings);
+      const result = await window.browserControlManager?.saveClaudeCodeSettings?.(settings);
       
       if (result?.success) {
         this.showApiStatus('配置保存成功', 'success');
         
         // 更新需求状态
-        this.wizardRequirements = await (window.apiAdapter || window.browserControlManager)?.recheckSetup?.();
+        this.wizardRequirements = await window.browserControlManager?.recheckSetup?.();
         
         // 进入 JS-EYES 安装页
         setTimeout(() => {
@@ -617,7 +617,7 @@ class SetupWizard {
   async skip() {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     try {
-      await (window.apiAdapter || window.browserControlManager)?.skipSetup?.();
+      await window.browserControlManager?.skipSetup?.();
       this.hide();
       this.showNotification(t('notifications.configLater'), 'info');
     } catch (error) {
@@ -631,7 +631,7 @@ class SetupWizard {
   async complete() {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     try {
-      await (window.apiAdapter || window.browserControlManager)?.completeSetup?.();
+      await window.browserControlManager?.completeSetup?.();
       this.hide();
       this.showNotification(t('notifications.configComplete'), 'success');
       
@@ -651,10 +651,10 @@ class SetupWizard {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     try {
       // 重置向导状态
-      await (window.apiAdapter || window.browserControlManager)?.resetSetupWizard?.();
+      await window.browserControlManager?.resetSetupWizard?.();
       
       // 获取最新需求
-      this.wizardRequirements = await (window.apiAdapter || window.browserControlManager)?.getSetupRequirements?.();
+      this.wizardRequirements = await window.browserControlManager?.getSetupRequirements?.();
       
       // 显示向导
       this.show();

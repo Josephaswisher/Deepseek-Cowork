@@ -69,7 +69,7 @@ class WorkspaceSettings {
   async load() {
     try {
       console.log('[WorkspaceSettings] Loading...');
-      const settings = await (window.apiAdapter || window.browserControlManager).getAllHappySettings();
+      const settings = await window.browserControlManager.getAllHappySettings();
       console.log('[WorkspaceSettings] Settings:', settings);
 
       // 工作目录
@@ -176,7 +176,7 @@ class WorkspaceSettings {
         permissionMode: this.elements.permissionModeSelect?.value
       };
 
-      const result = await (window.apiAdapter || window.browserControlManager).saveHappySettings(settings);
+      const result = await window.browserControlManager.saveHappySettings(settings);
       
       if (result.success) {
         if (result.needsRestart) {
@@ -202,7 +202,7 @@ class WorkspaceSettings {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     
     try {
-      const result = await (window.apiAdapter || window.browserControlManager).selectWorkspaceDir();
+      const result = await window.browserControlManager.selectWorkspaceDir();
       
       if (result?.success && result.path) {
         this.workspaceDir = result.path;
@@ -235,7 +235,7 @@ class WorkspaceSettings {
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     
     try {
-      const result = await (window.apiAdapter || window.browserControlManager).resetWorkspaceDir();
+      const result = await window.browserControlManager.resetWorkspaceDir();
       
       if (result?.success) {
         this.workspaceDir = result.path;

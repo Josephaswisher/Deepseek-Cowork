@@ -694,16 +694,16 @@ class ToolCallRenderer {
     
     switch (action) {
       case 'allow':
-        await (window.apiAdapter || window.browserControlManager).allowPermission?.(sessionId, permissionId);
+        await window.browserControlManager.allowPermission?.(sessionId, permissionId);
         break;
       case 'allowAllEdits':
-        await (window.apiAdapter || window.browserControlManager).allowPermission?.(sessionId, permissionId, 'acceptEdits');
+        await window.browserControlManager.allowPermission?.(sessionId, permissionId, 'acceptEdits');
         break;
       case 'allowForSession':
-        await (window.apiAdapter || window.browserControlManager).allowPermission?.(sessionId, permissionId, null, [tool.name]);
+        await window.browserControlManager.allowPermission?.(sessionId, permissionId, null, [tool.name]);
         break;
       case 'deny':
-        await (window.apiAdapter || window.browserControlManager).denyPermission?.(sessionId, permissionId);
+        await window.browserControlManager.denyPermission?.(sessionId, permissionId);
         break;
       default:
         throw new Error(`Unknown action: ${action}`);
