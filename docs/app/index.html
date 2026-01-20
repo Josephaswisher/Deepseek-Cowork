@@ -1271,6 +1271,28 @@
   <script src="js/wizards/SetupWizard.js"></script>
   <script src="js/wizards/AccountSetup.js"></script>
   
+  <!-- Initialize ApiAdapter and ConnectionGuide for Web mode -->
+  <script>
+    (async function() {
+      // Initialize ApiAdapter
+      if (typeof ApiAdapter !== 'undefined' && window.apiAdapter) {
+        try {
+          const result = await window.apiAdapter.initialize();
+          console.log('[Init] ApiAdapter initialized:', result);
+          
+          // Initialize ConnectionGuide (only shows in Web mode when disconnected)
+          if (typeof ConnectionGuide !== 'undefined') {
+            window.connectionGuide = new ConnectionGuide();
+            await window.connectionGuide.initialize();
+            console.log('[Init] ConnectionGuide initialized');
+          }
+        } catch (error) {
+          console.error('[Init] ApiAdapter initialization failed:', error);
+        }
+      }
+    })();
+  </script>
+  
   <script src="js/core/ApiAdapter.js"></script>
     <script src="js/core/WebSocketClient.js"></script>
     <script src="js/components/ConnectionGuide.js"></script>
