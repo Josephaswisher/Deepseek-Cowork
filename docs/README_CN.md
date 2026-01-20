@@ -88,12 +88,67 @@
 
 # 技术文档
 
+## 架构亮点
+
+DeepSeek Cowork 采用独特的 **Hybrid SaaS** 混合架构，融合了云端 SaaS 和本地桌面应用的优势：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          用户电脑                                │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
+│  │   Electron   │    │    浏览器     │    │   CLI 工具       │  │
+│  │   桌面应用   │    │  (Chrome,    │    │ deepseek-cowork  │  │
+│  │              │    │   Edge...)   │    │                  │  │
+│  └──────┬───────┘    └──────┬───────┘    └────────┬─────────┘  │
+│         │ IPC               │ HTTP/WS             │ 管理       │
+│         └───────────────────┼─────────────────────┘            │
+│                             ▼                                   │
+│                    ┌────────────────┐                          │
+│                    │  LocalService  │◄── 所有数据留在本地       │
+│                    │  (Node.js)     │                          │
+│                    └────────┬───────┘                          │
+└─────────────────────────────┼───────────────────────────────────┘
+                              │ 加密传输
+                              ▼
+                    ┌────────────────┐
+                    │   Happy AI     │
+                    │   (云端)       │
+                    └────────────────┘
+```
+
+| 特性 | 优势 |
+|------|------|
+| **零服务器成本** | 静态前端托管在 GitHub Pages，无需后端基础设施 |
+| **数据隐私** | 所有用户数据、设置和文件都保留在本地 |
+| **统一体验** | 桌面应用和浏览器使用完全相同的界面和体验 |
+
+### 工作原理
+
+1. **桌面模式**：Electron 应用通过 IPC 与 LocalService 通信
+2. **Web 模式**：浏览器通过 HTTP/WebSocket 连接本地的 `localhost:3333`
+3. **CLI 模式**：直接从终端管理 LocalService
+
+`ApiAdapter` 适配层会自动检测运行环境，并将 API 调用路由到正确的通道。
+
+## Happy 集成
+
+DeepSeek Cowork 集成了 [Happy](https://github.com/slopus/happy)，一个开源的 AI 编程助手移动端和 Web 客户端。
+
+| 特性 | 说明 |
+|------|------|
+| **端到端加密** | 所有消息在本地加密后传输，数据从不以明文形式离开你的设备 |
+| **手机端访问** | 使用 Happy App（[iOS](https://apps.apple.com/us/app/happy-claude-code-client/id6748571505) / [Android](https://play.google.com/store/apps/details?id=com.ex3ndr.happy)）随时随地监控和操作 AI 任务 |
+| **推送通知** | AI 需要权限或遇到错误时，手机端收到即时通知 |
+| **完全开源** | 代码可审计，无遥测、无追踪 |
+
+> DeepSeek Cowork 使用 Happy 的账户服务器进行会话管理和跨设备加密同步。
+
 ## 核心组件
 
 | 组件 | 说明 |
 |------|------|
-| **Claude Code** | AI 内核，提供代码理解和生成能力 |
-| **[Happy](https://github.com/slopus/happy)** | 基于开源项目，提供 AI 会话管理、端到端加密、多设备同步 |
+| **Claude Code** | 原版 Claude Code 作为 Agent 内核集成，具备完整功能和特性 |
+| **[Happy](https://github.com/slopus/happy)** | 开源 AI 会话管理，支持端到端加密和手机 App |
 | **[JS Eyes](https://github.com/imjszhang/js-eyes)** | 浏览器扩展，控制标签页、执行脚本、提取数据 |
 | **Electron 应用** | 跨平台桌面界面，整合所有组件 |
 
@@ -107,6 +162,54 @@ npm start
 ```
 
 开发模式：`npm run dev`
+
+## Web 版使用 (Hybrid SaaS)
+
+无需安装桌面应用，直接在浏览器中使用 DeepSeek Cowork。
+
+### 在线体验
+
+访问 [deepseek-cowork.com](https://deepseek-cowork.com) 体验 Web 界面。
+
+### 环境要求
+
+- Node.js 18+
+- npm 或 yarn
+
+### 配置本地服务
+
+```bash
+# 全局安装 CLI 工具
+npm install -g deepseek-cowork
+
+# 启动本地服务（后台模式）
+deepseek-cowork start --daemon
+
+# 在浏览器中打开 Web 界面
+deepseek-cowork open
+```
+
+### CLI 命令参考
+
+| 命令 | 说明 |
+|------|------|
+| `deepseek-cowork start` | 启动本地服务（前台） |
+| `deepseek-cowork start --daemon` | 启动本地服务（后台） |
+| `deepseek-cowork stop` | 停止本地服务 |
+| `deepseek-cowork status` | 查看服务状态 |
+| `deepseek-cowork open` | 在浏览器中打开 Web 界面 |
+| `deepseek-cowork config` | 查看/编辑配置 |
+
+### 构建 Web 版本
+
+```bash
+# 构建静态文件用于 Web 部署
+npm run build:web
+
+# 输出目录: docs/app/
+```
+
+Web 前端会自动部署到 GitHub Pages。
 
 ## 打包桌面客户端
 

@@ -88,12 +88,67 @@ Use natural language to have AI help you with:
 
 # Technical Documentation
 
+## Architecture Highlights
+
+DeepSeek Cowork adopts a unique **Hybrid SaaS** architecture, combining the best of cloud-based SaaS and local desktop applications:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        User's Computer                          │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
+│  │   Electron   │    │  Web Browser │    │   CLI Tool       │  │
+│  │   Desktop    │    │  (Chrome,    │    │ deepseek-cowork  │  │
+│  │     App      │    │   Edge...)   │    │                  │  │
+│  └──────┬───────┘    └──────┬───────┘    └────────┬─────────┘  │
+│         │ IPC               │ HTTP/WS             │ manage     │
+│         └───────────────────┼─────────────────────┘            │
+│                             ▼                                   │
+│                    ┌────────────────┐                          │
+│                    │  LocalService  │◄── All data stays local  │
+│                    │  (Node.js)     │                          │
+│                    └────────┬───────┘                          │
+└─────────────────────────────┼───────────────────────────────────┘
+                              │ Encrypted
+                              ▼
+                    ┌────────────────┐
+                    │   Happy AI     │
+                    │   (Cloud)      │
+                    └────────────────┘
+```
+
+| Feature | Benefit |
+|---------|---------|
+| **Zero Server Cost** | Static frontend hosted on GitHub Pages, no backend infrastructure needed |
+| **Data Privacy** | All user data, settings, and files remain on your local machine |
+| **Unified Experience** | Same UI/UX whether using Desktop app or Web browser |
+
+### How It Works
+
+1. **Desktop Mode**: Electron app communicates with LocalService via IPC
+2. **Web Mode**: Browser connects to LocalService via HTTP/WebSocket on `localhost:3333`
+3. **CLI Mode**: Manage LocalService directly from terminal
+
+The `ApiAdapter` layer automatically detects the environment and routes API calls appropriately.
+
+## Happy Integration
+
+DeepSeek Cowork integrates with [Happy](https://github.com/slopus/happy), an open-source mobile and web client for AI coding agents.
+
+| Feature | Description |
+|---------|-------------|
+| **End-to-End Encryption** | All messages are encrypted locally before transmission - your data never leaves your device unencrypted |
+| **Mobile Access** | Use the Happy App ([iOS](https://apps.apple.com/us/app/happy-claude-code-client/id6748571505) / [Android](https://play.google.com/store/apps/details?id=com.ex3ndr.happy)) to monitor and control AI tasks on the go |
+| **Push Notifications** | Get alerted when AI needs permission or encounters errors |
+| **Open Source** | Fully auditable code with no telemetry or tracking |
+
+> DeepSeek Cowork uses Happy's account server for session management and encrypted sync across devices.
+
 ## Core Components
 
 | Component | Description |
 |-----------|-------------|
-| **Claude Code** | AI kernel for code understanding and generation |
-| **[Happy](https://github.com/slopus/happy)** | Based on open-source project, provides AI session management, E2E encryption, multi-device sync |
+| **Claude Code** | Original Claude Code integrated as Agent kernel with all features and capabilities |
+| **[Happy](https://github.com/slopus/happy)** | Open-source AI session management with E2E encryption and mobile app support |
 | **[JS Eyes](https://github.com/imjszhang/js-eyes)** | Browser extension for tab control, script execution, data extraction |
 | **Electron App** | Cross-platform desktop interface integrating all components |
 
@@ -107,6 +162,54 @@ npm start
 ```
 
 Development mode: `npm run dev`
+
+## Web Version (Hybrid SaaS)
+
+Use DeepSeek Cowork directly in your browser without installing the desktop app.
+
+### Online Demo
+
+Visit [deepseek-cowork.com](https://deepseek-cowork.com) to try the web interface.
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Setup Local Service
+
+```bash
+# Install CLI tool globally
+npm install -g deepseek-cowork
+
+# Start local service (background mode)
+deepseek-cowork start --daemon
+
+# Open web interface in browser
+deepseek-cowork open
+```
+
+### CLI Commands Reference
+
+| Command | Description |
+|---------|-------------|
+| `deepseek-cowork start` | Start local service (foreground) |
+| `deepseek-cowork start --daemon` | Start local service (background) |
+| `deepseek-cowork stop` | Stop local service |
+| `deepseek-cowork status` | Check service status |
+| `deepseek-cowork open` | Open web interface in browser |
+| `deepseek-cowork config` | View/edit configuration |
+
+### Build Web Version
+
+```bash
+# Build static files for web deployment
+npm run build:web
+
+# Output: docs/app/
+```
+
+The web frontend is deployed to GitHub Pages automatically.
 
 ## Building Desktop Clients
 
