@@ -214,6 +214,9 @@ class ChatPanel {
       if (messages && messages.length > 0 && this.app?.happyMessageHandler) {
         console.log(`[ChatPanel] Loading ${messages.length} history messages via Reducer`);
         this.app.happyMessageHandler.handleHistoryMessages(messages);
+      } else {
+        // 没有历史消息，恢复欢迎信息
+        this.restoreWelcomeMessage();
       }
     } catch (error) {
       console.error('[ChatPanel] Load history failed:', error);
@@ -236,6 +239,32 @@ class ChatPanel {
     if (this.app?.happyMessageHandler) {
       this.app.happyMessageHandler.clearMessages();
     }
+    
+    // 恢复欢迎信息
+    this.restoreWelcomeMessage();
+  }
+
+  /**
+   * 恢复欢迎信息
+   */
+  restoreWelcomeMessage() {
+    const container = this.elements.aiMessages;
+    if (!container) return;
+    
+    // 如果已有欢迎信息，不重复添加
+    if (container.querySelector('.ai-welcome')) return;
+    
+    const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
+    
+    const welcomeDiv = document.createElement('div');
+    welcomeDiv.className = 'ai-welcome';
+    welcomeDiv.innerHTML = `
+      <span class="welcome-icon"><svg viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span>
+      <h3>${t('chat.welcomeTitle')}</h3>
+      <p>${t('chat.welcomeDesc')}</p>
+    `;
+    
+    container.appendChild(welcomeDiv);
   }
 
   /**
@@ -466,12 +495,18 @@ class ChatPanel {
       return;
     }
 
-    // 移除欢迎信息
-    const welcome = container.querySelector('.ai-welcome');
-    if (welcome) welcome.remove();
-
     // 根据消息类型分发渲染
     const { MessageKind } = window.MessageTypes;
+    
+    // 只有历史消息（用户消息、Agent消息、工具调用）才移除欢迎信息
+    // 系统消息和事件消息不算历史消息，不移除欢迎信息
+    const isHistoryMessage = message.kind === MessageKind.USER_TEXT || 
+                             message.kind === MessageKind.AGENT_TEXT || 
+                             message.kind === MessageKind.TOOL_CALL;
+    if (isHistoryMessage) {
+      const welcome = container.querySelector('.ai-welcome');
+      if (welcome) welcome.remove();
+    }
     
     switch (message.kind) {
       case MessageKind.USER_TEXT:
