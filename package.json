@@ -21,7 +21,9 @@
   },
   "keywords": [
     "deepseek",
+    "deepseek-cowork",
     "claude-cowork",
+    "claude-cowork-alternative",
     "open-source",
     "ai-assistant",
     "browser-automation",
@@ -33,7 +35,12 @@
     "automation",
     "browser-extension",
     "ai",
-    "management"
+    "self-hosted",
+    "privacy-first",
+    "local-ai",
+    "web-scraping",
+    "form-automation",
+    "deepseek-api"
   ],
   "author": "",
   "license": "MIT",
