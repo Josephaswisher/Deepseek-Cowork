@@ -248,7 +248,27 @@ try {
             "libsodium-wrappers": "^0.7.13",
             
             // happy-cli 工具解压依赖
-            "tar": "^7.5.2"
+            "tar": "^7.5.2",
+            
+            // happy-cli 运行时依赖（daemon 启动所需）
+            "@agentclientprotocol/sdk": "^0.8.0",
+            "@modelcontextprotocol/sdk": "^1.22.0",
+            "@stablelib/base64": "^2.0.1",
+            "@stablelib/hex": "^2.0.1",
+            "ai": "^5.0.107",
+            "cross-spawn": "^7.0.6",
+            "expo-server-sdk": "^3.15.0",
+            "fastify": "^5.6.2",
+            "fastify-type-provider-zod": "4.0.2",
+            "http-proxy": "^1.18.1",
+            "http-proxy-middleware": "^3.0.5",
+            "ink": "^6.5.1",
+            "ps-list": "^8.1.1",
+            "qrcode-terminal": "^0.12.0",
+            "react": "^19.2.0",
+            "tmp": "^0.2.5",
+            "tweetnacl": "^1.0.3",
+            "zod": "^3.23.8"
         },
         engines: {
             node: ">=18.0.0"
