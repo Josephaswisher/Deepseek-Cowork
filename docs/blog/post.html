@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Post - DeepSeek Cowork Blog</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" id="meta-description" content="DeepSeek Cowork Blog">
+    <meta name="author" content="imjszhang">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" id="og-title" content="DeepSeek Cowork Blog">
+    <meta property="og:description" id="og-description" content="DeepSeek Cowork Blog">
+    <meta property="og:image" content="https://deepseek-cowork.com/images/preview.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="../favicon.ico">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Marked.js - Markdown Parser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+    
+    <!-- Highlight.js - Code Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: '#f5f5f5',
+                        secondary: '#a3a3a3',
+                        dark: {
+                            900: '#171717',
+                            950: '#0a0a0a',
+                        },
+                        accent: {
+                            cyan: '#ffffff',
+                            purple: '#d4d4d4',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.6s ease-out',
+                        'slide-up': 'slideUp 0.8s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(30px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom Styles -->
+    <style>
+        body {
+            background-color: #000000;
+        }
+        
+        /* Glassmorphism effect */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Navbar styles */
+        .navbar {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Button styles */
+        .btn {
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        .btn-primary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #000000; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333333; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555555; 
+        }
+        
+        /* Tag styles */
+        .tag {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+    </style>
+    
+    <!-- Markdown Content Styles -->
+    <link rel="stylesheet" href="./css/blog.css">
+</head>
+<body class="bg-black min-h-screen font-sans text-neutral-200 selection:bg-white/20 selection:text-white">
+    <!-- Navbar -->
+    <nav class="navbar fixed top-0 left-0 right-0 z-[1000] px-4 sm:px-6 lg:px-8 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <a href="../" class="flex items-center gap-2">
+                <div class="w-10 h-10 rounded-lg bg-black border border-white/10 flex items-center justify-center overflow-hidden">
+                    <svg width="32" height="32" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+                        <g transform="translate(64, 64)">
+                            <ellipse cx="0" cy="0" rx="42" ry="14" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.6" transform="rotate(-15)"/>
+                            <g fill="none" stroke="#ffffff" stroke-width="1.5">
+                                <circle cx="0" cy="0" r="28" opacity="0.9"/>
+                                <ellipse cx="0" cy="0" rx="28" ry="10" opacity="0.7"/>
+                                <ellipse cx="0" cy="0" rx="28" ry="10" opacity="0.7" transform="rotate(60)"/>
+                            </g>
+                            <circle cx="0" cy="0" r="3" fill="#ffffff"/>
+                        </g>
+                    </svg>
+                </div>
+                <span class="text-xl font-bold text-white">DeepSeek Cowork</span>
+            </a>
+            <div class="hidden md:flex items-center gap-6">
+                <a href="../#features" class="text-neutral-300 hover:text-white transition-colors">Features</a>
+                <a href="../#scenarios" class="text-neutral-300 hover:text-white transition-colors">Use Cases</a>
+                <a href="./" class="text-white font-medium">Blog</a>
+                <a href="../#quickstart" class="text-neutral-300 hover:text-white transition-colors">Quick Start</a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="https://github.com/imjszhang/deepseek-cowork" target="_blank" class="btn btn-primary px-4 py-2 rounded-lg text-sm font-semibold hidden sm:flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+                <a href="../app/" class="btn btn-primary px-6 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Launch App
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-3xl mx-auto">
+            <!-- Back Button -->
+            <a href="./" class="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors mb-8">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+                Back to Posts
+            </a>
+            
+            <!-- Post Header -->
+            <header id="post-header" class="mb-8 animate-slide-up">
+                <!-- Dynamically filled by JS -->
+            </header>
+            
+            <!-- Post Content Container -->
+            <article id="post-content" class="prose prose-invert animate-fade-in">
+                <!-- Loading State -->
+                <div id="loading-state" class="text-center py-12">
+                    <div class="inline-block w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
+                    <p class="text-neutral-400 mt-4">Loading post...</p>
+                </div>
+            </article>
+            
+            <!-- Error State -->
+            <div id="error-state" class="hidden text-center py-12">
+                <svg class="w-16 h-16 mx-auto text-red-400/60 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <p class="text-neutral-400 mb-4">Failed to load post</p>
+                <a href="./" class="btn btn-secondary px-4 py-2 rounded-lg text-sm">Back to Posts</a>
+            </div>
+            
+            <!-- Post Footer Navigation -->
+            <footer id="post-footer" class="mt-12 pt-8 border-t border-white/10 hidden">
+                <a href="./" class="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                    Back to Posts
+                </a>
+            </footer>
+        </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="py-8 px-4 sm:px-6 lg:px-8 border-t border-white/10">
+        <div class="max-w-4xl mx-auto text-center text-sm text-neutral-400">
+            <p>&copy; 2026 DeepSeek Cowork. MIT License.</p>
+        </div>
+    </footer>
+    
+    <!-- Blog Rendering Script -->
+    <script src="./js/blog.js"></script>
+    <script>
+        // Initialize post detail page
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const slug = params.get('slug');
+            
+            if (slug) {
+                Blog.loadPost(slug);
+            } else {
+                // No slug parameter, redirect to list page
+                window.location.href = './';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "welcome",
+    "title": "Welcome to DeepSeek Cowork Blog",
+    "date": "2026-01-21",
+    "summary": "Welcome to the DeepSeek Cowork blog! Here we share project updates, technical insights, and tutorials.",
+    "tags": ["Announcement"],
+    "author": {
+      "name": "imjszhang",
+      "avatar": "https://unavatar.io/x/imjszhang",
+      "url": "https://x.com/imjszhang"
+    }
+  },
+  {
+    "slug": "getting-started",
+    "title": "Getting Started with DeepSeek Cowork",
+    "date": "2026-01-21",
+    "summary": "Learn how to quickly install and configure DeepSeek Cowork to let AI assist you with daily tasks.",
+    "tags": ["Tutorial", "Getting Started"],
+    "author": {
+      "name": "imjszhang",
+      "avatar": "https://unavatar.io/x/imjszhang",
+      "url": "https://x.com/imjszhang"
+    }
+  }
+]
