@@ -1,5 +1,5 @@
 ---
-title: Browser Control API 参考
+title: Browser Control API Reference
 version: 1.0.0
 created: 2026-01-10
 updated: 2026-01-10
@@ -7,31 +7,31 @@ author: agent-kaichi
 status: stable
 ---
 
-# Browser Control API 参考
+# Browser Control API Reference
 
-本文档提供 Browser Control Manager 所有 HTTP API 的完整说明。
+This document provides complete documentation for all Browser Control Manager HTTP APIs.
 
-**基础地址**: `http://localhost:3333`
+**Base URL**: `http://localhost:3333`
 
-**API 前缀**: `/api/browser`
+**API Prefix**: `/api/browser`
 
 ---
 
-## 1. 状态查询
+## 1. Status Queries
 
 ### GET /api/browser/status
 
-获取服务运行状态和连接信息。
+Get service running status and connection information.
 
-**参数**: 无
+**Parameters**: None
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl http://localhost:3333/api/browser/status
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
@@ -57,17 +57,17 @@ curl http://localhost:3333/api/browser/status
 
 ### GET /api/browser/config
 
-获取服务配置信息。
+Get service configuration information.
 
-**参数**: 无
+**Parameters**: None
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl http://localhost:3333/api/browser/config
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
@@ -90,21 +90,21 @@ curl http://localhost:3333/api/browser/config
 
 ---
 
-## 2. 标签页操作
+## 2. Tab Operations
 
 ### GET /api/browser/tabs
 
-获取所有已连接浏览器的标签页列表。
+Get tab list from all connected browsers.
 
-**参数**: 无
+**Parameters**: None
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl http://localhost:3333/api/browser/tabs
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
@@ -128,59 +128,59 @@ curl http://localhost:3333/api/browser/tabs
 
 ### POST /api/browser/open_url
 
-打开新标签页或在指定标签页中导航到 URL。
+Open a new tab or navigate to URL in a specified tab.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `url` | string | 是 | 要打开的 URL |
-| `tabId` | number | 否 | 指定标签页 ID，不传则新建标签页 |
-| `windowId` | number | 否 | 指定窗口 ID |
-| `requestId` | string | 否 | 请求 ID，用于追踪异步结果 |
-| `callbackUrl` | string | 否 | 回调 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `url` | string | Yes | URL to open |
+| `tabId` | number | No | Specify tab ID; creates new tab if not provided |
+| `windowId` | number | No | Specify window ID |
+| `requestId` | string | No | Request ID for tracking async results |
+| `callbackUrl` | string | No | Callback URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
-# 打开新标签页
+# Open new tab
 curl -X POST http://localhost:3333/api/browser/open_url \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com"}'
 
-# 在指定标签页中导航
+# Navigate in specified tab
 curl -X POST http://localhost:3333/api/browser/open_url \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "tabId": 123456789}'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "消息已发送",
+  "message": "Message sent",
   "needsCallback": true
 }
 ```
 
-**注意**: 此操作是异步的，`needsCallback: true` 表示需要等待回调或轮询结果。
+**Note**: This operation is asynchronous. `needsCallback: true` indicates you need to wait for callback or poll for results.
 
 ---
 
 ### POST /api/browser/close_tab
 
-关闭指定标签页。
+Close a specified tab.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `tabId` | number | 是 | 要关闭的标签页 ID |
-| `requestId` | string | 否 | 请求 ID |
-| `callbackUrl` | string | 否 | 回调 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabId` | number | Yes | Tab ID to close |
+| `requestId` | string | No | Request ID |
+| `callbackUrl` | string | No | Callback URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/close_tab \
@@ -188,12 +188,12 @@ curl -X POST http://localhost:3333/api/browser/close_tab \
   -d '{"tabId": 123456789}'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "消息已发送",
+  "message": "Message sent",
   "needsCallback": true
 }
 ```
@@ -202,17 +202,17 @@ curl -X POST http://localhost:3333/api/browser/close_tab \
 
 ### POST /api/browser/get_html
 
-获取指定标签页的 HTML 内容。
+Get HTML content of a specified tab.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `tabId` | number | 是 | 标签页 ID |
-| `requestId` | string | 否 | 请求 ID |
-| `callbackUrl` | string | 否 | 回调 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabId` | number | Yes | Tab ID |
+| `requestId` | string | No | Request ID |
+| `callbackUrl` | string | No | Callback URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/get_html \
@@ -220,82 +220,82 @@ curl -X POST http://localhost:3333/api/browser/get_html \
   -d '{"tabId": 123456789}'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "消息已发送",
+  "message": "Message sent",
   "needsCallback": true
 }
 ```
 
-**注意**: HTML 内容会通过回调或 SSE 事件 `tab_html_received` 返回。
+**Note**: HTML content is returned via callback or SSE event `tab_html_received`.
 
 ---
 
-## 3. 脚本执行
+## 3. Script Execution
 
 ### POST /api/browser/execute_script
 
-在指定标签页中执行 JavaScript 代码。
+Execute JavaScript code in a specified tab.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `tabId` | number | 是 | 标签页 ID |
-| `code` | string | 是 | 要执行的 JavaScript 代码 |
-| `requestId` | string | 否 | 请求 ID |
-| `callbackUrl` | string | 否 | 回调 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabId` | number | Yes | Tab ID |
+| `code` | string | Yes | JavaScript code to execute |
+| `requestId` | string | No | Request ID |
+| `callbackUrl` | string | No | Callback URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
-# 获取页面标题
+# Get page title
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.title"}'
 
-# 点击按钮
+# Click button
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"button\").click()"}'
 
-# 获取所有链接
+# Get all links
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "Array.from(document.querySelectorAll(\"a\")).map(a => ({href: a.href, text: a.textContent}))"}'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "消息已发送",
+  "message": "Message sent",
   "needsCallback": true
 }
 ```
 
-**注意**: 脚本执行结果通过回调或 SSE 事件 `script_executed` 返回。
+**Note**: Script execution results are returned via callback or SSE event `script_executed`.
 
 ---
 
 ### POST /api/browser/inject_css
 
-在指定标签页中注入 CSS 样式。
+Inject CSS styles into a specified tab.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `tabId` | number | 是 | 标签页 ID |
-| `css` | string | 是 | 要注入的 CSS 代码 |
-| `requestId` | string | 否 | 请求 ID |
-| `callbackUrl` | string | 否 | 回调 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabId` | number | Yes | Tab ID |
+| `css` | string | Yes | CSS code to inject |
+| `requestId` | string | No | Request ID |
+| `callbackUrl` | string | No | Callback URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/inject_css \
@@ -303,33 +303,33 @@ curl -X POST http://localhost:3333/api/browser/inject_css \
   -d '{"tabId": 123456789, "css": "body { background: #f0f0f0 !important; }"}'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "消息已发送",
+  "message": "Message sent",
   "needsCallback": true
 }
 ```
 
 ---
 
-## 4. Cookie 操作
+## 4. Cookie Operations
 
 ### POST /api/browser/get_cookies
 
-从浏览器获取指定标签页的 Cookie（实时获取）。
+Get cookies from browser for a specified tab (real-time retrieval).
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `tabId` | number | 是 | 标签页 ID |
-| `requestId` | string | 否 | 请求 ID |
-| `callbackUrl` | string | 否 | 回调 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabId` | number | Yes | Tab ID |
+| `requestId` | string | No | Request ID |
+| `callbackUrl` | string | No | Callback URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/get_cookies \
@@ -337,34 +337,34 @@ curl -X POST http://localhost:3333/api/browser/get_cookies \
   -d '{"tabId": 123456789}'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "消息已发送",
+  "message": "Message sent",
   "needsCallback": true,
   "requestId": "abc123"
 }
 ```
 
-**注意**: Cookie 数据通过回调或 SSE 事件 `cookies_received` 返回。
+**Note**: Cookie data is returned via callback or SSE event `cookies_received`.
 
 ---
 
 ### POST /api/browser/save_cookies
 
-将 Cookie 保存到本地数据库。
+Save cookies to local database.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `tabId` | number | 是 | 标签页 ID |
-| `cookies` | array | 是 | Cookie 数组 |
-| `url` | string | 否 | 页面 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabId` | number | Yes | Tab ID |
+| `cookies` | array | Yes | Cookie array |
+| `url` | string | No | Page URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/save_cookies \
@@ -384,12 +384,12 @@ curl -X POST http://localhost:3333/api/browser/save_cookies \
   }'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "成功保存 1 个cookies",
+  "message": "Successfully saved 1 cookies",
   "saveResult": true,
   "needsCallback": false
 }
@@ -399,31 +399,31 @@ curl -X POST http://localhost:3333/api/browser/save_cookies \
 
 ### GET /api/browser/cookies
 
-查询数据库中保存的 Cookie。
+Query saved cookies from database.
 
-**参数（Query String）**:
+**Parameters (Query String)**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `domain` | string | 否 | 按域名过滤（模糊匹配） |
-| `name` | string | 否 | 按名称过滤（模糊匹配） |
-| `limit` | number | 否 | 返回数量限制，默认 100 |
-| `offset` | number | 否 | 偏移量，默认 0 |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `domain` | string | No | Filter by domain (fuzzy match) |
+| `name` | string | No | Filter by name (fuzzy match) |
+| `limit` | number | No | Return limit, default 100 |
+| `offset` | number | No | Offset, default 0 |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
-# 获取所有 Cookie
+# Get all cookies
 curl "http://localhost:3333/api/browser/cookies"
 
-# 按域名过滤
+# Filter by domain
 curl "http://localhost:3333/api/browser/cookies?domain=example.com"
 
-# 分页查询
+# Paginated query
 curl "http://localhost:3333/api/browser/cookies?limit=50&offset=0"
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
@@ -450,29 +450,29 @@ curl "http://localhost:3333/api/browser/cookies?limit=50&offset=0"
 
 ---
 
-### GET /api/browser/cookies/:tabId (已废弃)
+### GET /api/browser/cookies/:tabId (Deprecated)
 
-> **⚠️ 已废弃**: 此 API 已废弃。cookies 表已重构，不再按 tabId 存储。请使用 `GET /api/browser/cookies?domain=xxx` 按域名查询。
+> **⚠️ Deprecated**: This API is deprecated. The cookies table has been restructured and no longer stores by tabId. Please use `GET /api/browser/cookies?domain=xxx` to query by domain.
 
-~~获取指定标签页保存的 Cookie。~~
+~~Get cookies saved for a specified tab.~~
 
-**替代方案**:
+**Alternatives**:
 
-- `GET /api/browser/cookies` - 获取所有 cookies
-- `GET /api/browser/cookies?domain=xxx` - 按域名过滤
-- `GET /api/browser/cookies/domain/:domain` - 按域名获取
+- `GET /api/browser/cookies` - Get all cookies
+- `GET /api/browser/cookies?domain=xxx` - Filter by domain
+- `GET /api/browser/cookies/domain/:domain` - Get by domain
 
-**返回示例（HTTP 410 Gone）**:
+**Response Example (HTTP 410 Gone)**:
 
 ```json
 {
   "status": "error",
-  "message": "此 API 已废弃。cookies 表已重构，不再按 tabId 存储。请使用 GET /api/browser/cookies?domain=xxx 按域名查询。",
+  "message": "This API is deprecated. The cookies table has been restructured and no longer stores by tabId. Please use GET /api/browser/cookies?domain=xxx to query by domain.",
   "needsCallback": false,
   "alternatives": [
-    "GET /api/browser/cookies - 获取所有 cookies",
-    "GET /api/browser/cookies?domain=xxx - 按域名过滤",
-    "GET /api/browser/cookies/domain/:domain - 按域名获取"
+    "GET /api/browser/cookies - Get all cookies",
+    "GET /api/browser/cookies?domain=xxx - Filter by domain",
+    "GET /api/browser/cookies/domain/:domain - Get by domain"
   ]
 }
 ```
@@ -481,17 +481,17 @@ curl "http://localhost:3333/api/browser/cookies?limit=50&offset=0"
 
 ### GET /api/browser/cookies/stats
 
-获取 Cookie 统计信息。
+Get cookie statistics.
 
-**参数**: 无
+**Parameters**: None
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl http://localhost:3333/api/browser/cookies/stats
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
@@ -509,27 +509,27 @@ curl http://localhost:3333/api/browser/cookies/stats
 
 ---
 
-## 5. 文件上传
+## 5. File Upload
 
 ### POST /api/browser/upload_file_to_tab
 
-向页面中的文件输入框上传文件。
+Upload files to a file input on the page.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `tabId` | number | 是 | 标签页 ID |
-| `files` | array | 是 | 文件数组 |
-| `files[].name` | string | 是 | 文件名 |
-| `files[].base64` | string | 是 | Base64 编码的文件内容 |
-| `files[].type` | string | 是 | MIME 类型 |
-| `files[].size` | number | 否 | 文件大小（字节） |
-| `targetSelector` | string | 否 | 目标元素选择器，默认 `input[type="file"]` |
-| `requestId` | string | 否 | 请求 ID |
-| `callbackUrl` | string | 否 | 回调 URL |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tabId` | number | Yes | Tab ID |
+| `files` | array | Yes | File array |
+| `files[].name` | string | Yes | File name |
+| `files[].base64` | string | Yes | Base64 encoded file content |
+| `files[].type` | string | Yes | MIME type |
+| `files[].size` | number | No | File size (bytes) |
+| `targetSelector` | string | No | Target element selector, default `input[type="file"]` |
+| `requestId` | string | No | Request ID |
+| `callbackUrl` | string | No | Callback URL |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/upload_file_to_tab \
@@ -548,56 +548,56 @@ curl -X POST http://localhost:3333/api/browser/upload_file_to_tab \
   }'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "消息已发送",
+  "message": "Message sent",
   "needsCallback": true
 }
 ```
 
-**支持的文件类型**:
-- 图片: jpeg, jpg, png, gif, webp, bmp, svg+xml
-- 文档: pdf, txt, csv, doc, docx, xls, xlsx
-- 媒体: mp3, wav, mp4, webm
+**Supported File Types**:
+- Images: jpeg, jpg, png, gif, webp, bmp, svg+xml
+- Documents: pdf, txt, csv, doc, docx, xls, xlsx
+- Media: mp3, wav, mp4, webm
 
-**限制**: 单文件最大 50MB
+**Limits**: Maximum 50MB per file
 
 ---
 
-## 6. 事件
+## 6. Events
 
 ### GET /api/browser/events
 
-建立 SSE（Server-Sent Events）连接，接收实时事件。
+Establish SSE (Server-Sent Events) connection to receive real-time events.
 
-**参数**: 无
+**Parameters**: None
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -N http://localhost:3333/api/browser/events
 ```
 
-**事件类型**:
+**Event Types**:
 
-| 事件 | 说明 |
-|------|------|
-| `connected` | SSE 连接建立 |
-| `tabs_update` | 标签页列表更新 |
-| `tab_opened` | 新标签页打开 |
-| `tab_closed` | 标签页关闭 |
-| `tab_url_changed` | 标签页 URL 变更 |
-| `tab_html_received` | 收到页面 HTML |
-| `script_executed` | 脚本执行完成 |
-| `css_injected` | CSS 注入完成 |
-| `cookies_received` | 收到 Cookie 数据 |
-| `error` | 错误事件 |
-| `custom_event` | 自定义事件 |
+| Event | Description |
+|-------|-------------|
+| `connected` | SSE connection established |
+| `tabs_update` | Tab list updated |
+| `tab_opened` | New tab opened |
+| `tab_closed` | Tab closed |
+| `tab_url_changed` | Tab URL changed |
+| `tab_html_received` | Page HTML received |
+| `script_executed` | Script execution completed |
+| `css_injected` | CSS injection completed |
+| `cookies_received` | Cookie data received |
+| `error` | Error event |
+| `custom_event` | Custom event |
 
-**事件格式**:
+**Event Format**:
 
 ```
 event: tabs_update
@@ -611,16 +611,16 @@ data: {"tabId":123,"result":"Hello World"}
 
 ### POST /api/browser/emit_event
 
-发送自定义事件到 SSE 客户端。
+Send custom event to SSE clients.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `eventName` | string | 是 | 事件名称 |
-| `data` | object | 否 | 事件数据 |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `eventName` | string | Yes | Event name |
+| `data` | object | No | Event data |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/emit_event \
@@ -628,12 +628,12 @@ curl -X POST http://localhost:3333/api/browser/emit_event \
   -d '{"eventName": "my_event", "data": {"message": "Hello"}}'
 ```
 
-**返回示例**:
+**Response Example**:
 
 ```json
 {
   "status": "success",
-  "message": "自定义事件 'my_event' 已发送",
+  "message": "Custom event 'my_event' sent",
   "eventData": {
     "eventName": "my_event",
     "data": { "message": "Hello" },
@@ -644,25 +644,25 @@ curl -X POST http://localhost:3333/api/browser/emit_event \
 
 ---
 
-## 7. 回调
+## 7. Callbacks
 
 ### GET /api/browser/callback_response/:requestId
 
-获取异步操作的结果。
+Get results of async operations.
 
-**参数**:
+**Parameters**:
 
-| 字段 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| `requestId` | string | 是 | 请求 ID（路径参数） |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `requestId` | string | Yes | Request ID (path parameter) |
 
-**curl 示例**:
+**curl Example**:
 
 ```bash
 curl http://localhost:3333/api/browser/callback_response/abc123
 ```
 
-**返回示例（成功）**:
+**Response Example (Success)**:
 
 ```json
 {
@@ -674,42 +674,42 @@ curl http://localhost:3333/api/browser/callback_response/abc123
 }
 ```
 
-**返回示例（未找到）**:
+**Response Example (Not Found)**:
 
 ```json
 {
   "status": "error",
-  "message": "未找到给定请求ID的响应"
+  "message": "No response found for the given request ID"
 }
 ```
 
 ---
 
-## 常见错误
+## Common Errors
 
-| 错误信息 | HTTP 状态码 | 原因 | 解决方案 |
-|----------|-------------|------|----------|
-| WebSocket服务器不可用 | 500 | 扩展连接服务未启动 | 检查服务是否正常运行 |
-| 标签页管理器不可用 | 500 | 内部服务错误 | 重启服务 |
-| 请求中缺少'url'参数 | 400 | 缺少必需参数 | 检查请求参数 |
-| 请求中缺少'tabId' | 400 | 缺少必需参数 | 提供有效的 tabId |
-| 数据库不可用 | 500 | 数据库连接失败 | 检查数据库文件 |
+| Error Message | HTTP Status | Cause | Solution |
+|---------------|-------------|-------|----------|
+| WebSocket server unavailable | 500 | Extension connection service not started | Check if service is running properly |
+| Tab manager unavailable | 500 | Internal service error | Restart service |
+| Missing 'url' parameter | 400 | Missing required parameter | Check request parameters |
+| Missing 'tabId' | 400 | Missing required parameter | Provide valid tabId |
+| Database unavailable | 500 | Database connection failed | Check database file |
 
 ---
 
-## 更新日志
+## Changelog
 
 ### v1.0.1 (2026-01-11)
-- 修复 `/api/browser/status` 路由缺失问题
-- 修复 `/api/browser/cookies/stats` 路由顺序问题
-- 废弃 `/api/browser/cookies/:tabId` API（cookies 表已重构，不再关联 tabId）
+- Fixed missing `/api/browser/status` route
+- Fixed `/api/browser/cookies/stats` route ordering issue
+- Deprecated `/api/browser/cookies/:tabId` API (cookies table restructured, no longer associated with tabId)
 
 ### v1.0.0 (2026-01-10)
-- 初始版本
-- 状态查询 API（status, config）
-- 标签页操作 API（tabs, open_url, close_tab, get_html）
-- 脚本执行 API（execute_script, inject_css）
-- Cookie 操作 API（get_cookies, save_cookies, cookies, cookies/:tabId, cookies/stats）
-- 文件上传 API（upload_file_to_tab）
-- 事件 API（events, emit_event）
-- 回调 API（callback_response）
+- Initial version
+- Status query APIs (status, config)
+- Tab operations APIs (tabs, open_url, close_tab, get_html)
+- Script execution APIs (execute_script, inject_css)
+- Cookie operations APIs (get_cookies, save_cookies, cookies, cookies/:tabId, cookies/stats)
+- File upload API (upload_file_to_tab)
+- Events APIs (events, emit_event)
+- Callback API (callback_response)

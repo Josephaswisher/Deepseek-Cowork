@@ -1,5 +1,5 @@
 ---
-title: 注入脚本编写指南
+title: Injection Script Writing Guide
 version: 1.2.0
 created: 2026-01-11
 updated: 2026-01-12
@@ -7,115 +7,115 @@ author: agent-kaichi
 status: stable
 ---
 
-# 注入脚本编写指南
+# Injection Script Writing Guide
 
-本文档提供通过 `execute_script` API 编写注入脚本的规范和最佳实践。
-
----
-
-## 概述
-
-通过 Browser Control 的 `execute_script` API 执行 JavaScript 时，脚本会在浏览器页面环境中运行，结果通过 HTTP/WebSocket 返回。这个过程涉及：
-
-1. **脚本传输**：JSON 格式通过 HTTP 发送
-2. **脚本执行**：在页面上下文中执行
-3. **结果序列化**：执行结果需要序列化后返回
-
-每个环节都有需要注意的问题。**编写脚本前，务必阅读本指南**。
+This document provides specifications and best practices for writing injection scripts via the `execute_script` API.
 
 ---
 
-## 1. 基本原则
+## Overview
 
-### 1.1 返回可序列化的值
+When executing JavaScript through Browser Control's `execute_script` API, scripts run in the browser page environment and results are returned via HTTP/WebSocket. This process involves:
 
-脚本的返回值必须是可 JSON 序列化的类型。
+1. **Script transmission**: Sent via HTTP in JSON format
+2. **Script execution**: Executed in page context
+3. **Result serialization**: Execution results need to be serialized before returning
+
+Each step has considerations to be aware of. **Read this guide before writing scripts**.
+
+---
+
+## 1. Basic Principles
+
+### 1.1 Return Serializable Values
+
+Script return values must be JSON-serializable types.
 
 ```javascript
-// 可序列化：string, number, boolean, null, array, plain object
+// Serializable: string, number, boolean, null, array, plain object
 document.title                    // string
 document.querySelectorAll('a').length  // number
 { name: 'test', value: 123 }      // object
 
-// 不可序列化：DOM 元素、函数、循环引用
-document.querySelector('.btn')     // HTMLElement -> 返回 {}
-() => {}                          // Function -> 无法序列化
+// Not serializable: DOM elements, functions, circular references
+document.querySelector('.btn')     // HTMLElement -> returns {}
+() => {}                          // Function -> cannot serialize
 ```
 
-### 1.2 使用 IIFE 封装复杂逻辑
+### 1.2 Use IIFE for Complex Logic
 
-对于多行脚本，使用立即执行函数表达式（IIFE）封装，避免变量泄露到全局作用域。
+For multi-line scripts, use Immediately Invoked Function Expression (IIFE) to avoid variable leaks to global scope.
 
 ```javascript
-// 推荐：IIFE 封装
+// Recommended: IIFE wrapper
 (() => {
   const items = document.querySelectorAll('.item');
   return Array.from(items).map(el => el.textContent);
 })()
 
-// 避免：直接声明变量
-const items = document.querySelectorAll('.item');  // 可能污染全局
+// Avoid: Direct variable declaration
+const items = document.querySelectorAll('.item');  // May pollute global
 Array.from(items).map(el => el.textContent);
 ```
 
-### 1.3 防御性编程
+### 1.3 Defensive Programming
 
-假设任何 DOM 操作都可能失败，使用可选链和空值合并。
+Assume any DOM operation can fail, use optional chaining and nullish coalescing.
 
 ```javascript
-// 安全：使用可选链
+// Safe: Use optional chaining
 document.querySelector('.title')?.innerText
 
-// 安全：提供默认值
-document.querySelector('.title')?.innerText ?? '未找到标题'
+// Safe: Provide default value
+document.querySelector('.title')?.innerText ?? 'Title not found'
 
-// 危险：直接访问可能不存在的元素
-document.querySelector('.title').innerText  // 元素不存在时报错
+// Dangerous: Direct access to potentially non-existent element
+document.querySelector('.title').innerText  // Errors if element doesn't exist
 ```
 
 ---
 
-## 2. 编码处理（重要）
+## 2. Encoding Handling (Important)
 
-### 2.1 问题描述
+### 2.1 Problem Description
 
-当脚本包含中文或其他非 ASCII 字符时，**必然**会出现编码问题：
+When scripts contain Chinese or other non-ASCII characters, encoding issues **will** occur:
 
-- **Shell 层面**：不同终端（PowerShell/Bash）对中文处理不同
-- **传输层面**：HTTP 请求中的 JSON 字符串编码不一致
-- **平台差异**：Windows 和 Unix 系统的默认编码不同
+- **Shell layer**: Different terminals (PowerShell/Bash) handle Chinese differently
+- **Transport layer**: JSON string encoding in HTTP requests inconsistent
+- **Platform differences**: Different default encodings between Windows and Unix systems
 
-**直接在 curl 命令中嵌入中文脚本几乎总是会失败**，特别是在 Windows PowerShell 中。
+**Embedding Chinese directly in curl commands will almost always fail**, especially in Windows PowerShell.
 
-### 2.2 何时需要处理
+### 2.2 When Handling is Needed
 
-**规则**：脚本中包含以下内容时，**必须**使用文件中转法：
+**Rule**: When script contains any of the following, you **must** use the file transfer method:
 
-- 中文字符（如：`搜索`、`提交`）
-- 日文、韩文等非拉丁字符
-- 特殊符号和 emoji
-- 复杂的多行脚本
+- Chinese characters (e.g., `搜索`, `提交`)
+- Japanese, Korean, or other non-Latin characters
+- Special symbols and emoji
+- Complex multi-line scripts
 
-### 2.3 处理方案
+### 2.3 Solutions
 
-#### 方案 A：文件中转法（首选，强烈推荐）
+#### Method A: File Transfer (Preferred, Strongly Recommended)
 
-**这是最可靠的方式**，完全绕过 Shell 编码问题。
+**This is the most reliable approach**, completely bypassing Shell encoding issues.
 
-**原理**：使用 Write 工具将请求体写入 JSON 文件（UTF-8 编码），然后用 `curl -d @filename` 读取文件发送请求。
+**Principle**: Use Write tool to write request body to JSON file (UTF-8 encoded), then use `curl -d @filename` to read file and send request.
 
-**标准流程**：
+**Standard Process**:
 
-**步骤 1**：使用 Write 工具在 workspace 目录创建请求文件 `.claude/data/browser-control/workspace/script_request.json`：
+**Step 1**: Use Write tool to create request file `.claude/data/browser-control/workspace/script_request.json` in workspace directory:
 
 ```json
 {
   "tabId": 123456789,
-  "code": "(() => { const title = document.querySelector('h1')?.innerText ?? '未找到标题'; return { success: true, title: title }; })()"
+  "code": "(() => { const title = document.querySelector('h1')?.innerText ?? 'Title not found'; return { success: true, title: title }; })()"
 }
 ```
 
-**步骤 2**：使用 curl 读取文件发送请求：
+**Step 2**: Use curl to read file and send request:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -123,38 +123,38 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   -d @.claude/data/browser-control/workspace/script_request.json
 ```
 
-**优势**：
-- Write 工具保证 UTF-8 编码正确
-- 完全避免 Shell 对中文的解析
-- 复杂脚本更易编写、调试和复用
-- 跨平台一致性好
+**Advantages**:
+- Write tool ensures correct UTF-8 encoding
+- Completely avoids Shell parsing of Chinese
+- Complex scripts easier to write, debug, and reuse
+- Good cross-platform consistency
 
-**使用辅助脚本（更简单）**：
+**Using Helper Script (Simpler)**:
 
 ```bash
-# 方式 1：传入完整的请求 JSON 文件（必须在 workspace 目录下）
+# Method 1: Pass complete request JSON file (must be in workspace directory)
 node .claude/skills/browser-control/scripts/run_script.js .claude/data/browser-control/workspace/script_request.json
 
-# 方式 2：传入 tabId 和脚本文件（必须在 workspace 目录下）
+# Method 2: Pass tabId and script file (must be in workspace directory)
 node .claude/skills/browser-control/scripts/run_script.js --tabId 123456789 .claude/data/browser-control/workspace/my_script.js
 ```
 
-#### 方案 B：Unicode 转义（备选）
+#### Method B: Unicode Escape (Alternative)
 
-当无法使用文件方式时，可将中文字符转换为 `\uXXXX` 格式的 Unicode 转义序列。
+When file method is not available, convert Chinese characters to `\uXXXX` format Unicode escape sequences.
 
 ```javascript
-// 原始代码（包含中文）
+// Original code (contains Chinese)
 document.querySelector('input').value = '搜索关键词'
 
-// 转义后（安全）
+// Escaped (safe)
 document.querySelector('input').value = '\u641c\u7d22\u5173\u952e\u8bcd'
 ```
 
-**转换方法**：
+**Conversion Method**:
 
 ```javascript
-// 在 Node.js 或浏览器控制台中运行
+// Run in Node.js or browser console
 function toUnicodeEscape(str) {
   return str.split('').map(char => {
     const code = char.charCodeAt(0);
@@ -166,37 +166,37 @@ function toUnicodeEscape(str) {
 }
 
 console.log(toUnicodeEscape('搜索关键词'));
-// 输出: \u641c\u7d22\u5173\u952e\u8bcd
+// Output: \u641c\u7d22\u5173\u952e\u8bcd
 ```
 
-**局限性**：
-- 需要手动转换每个中文字符串
-- 脚本可读性变差
-- 在某些 Shell 环境下仍可能有问题
+**Limitations**:
+- Need to manually convert each Chinese string
+- Reduced script readability
+- May still have issues in some Shell environments
 
-### 2.4 方案对比
+### 2.4 Method Comparison
 
-| 方案 | 可靠性 | 易用性 | 适用场景 |
-|------|--------|--------|----------|
-| 文件中转法 | 高 | 高 | 所有场景（推荐） |
-| Unicode 转义 | 中 | 低 | 简单脚本、无法写文件时 |
-| 直接嵌入 | 低 | - | 仅纯 ASCII 脚本 |
+| Method | Reliability | Ease of Use | Use Case |
+|--------|-------------|-------------|----------|
+| File transfer | High | High | All scenarios (recommended) |
+| Unicode escape | Medium | Low | Simple scripts, when file writing unavailable |
+| Direct embedding | Low | - | ASCII-only scripts |
 
-### 2.5 平台注意事项
+### 2.5 Platform Notes
 
 #### Windows PowerShell
 
-**警告**：PowerShell 对中文编码处理非常不稳定，**必须使用文件中转法**。
+**Warning**: PowerShell's Chinese encoding handling is very unstable, **must use file transfer method**.
 
-即使使用 Unicode 转义，PowerShell 的引号处理也可能导致问题：
+Even with Unicode escape, PowerShell's quote handling may cause issues:
 
 ```powershell
-# 不推荐：即使转义也可能失败
+# Not recommended: May fail even with escaping
 curl -X POST http://localhost:3333/api/browser/execute_script `
   -H "Content-Type: application/json" `
   -d '{"tabId": 123, "code": "document.title"}'
 
-# 推荐：使用文件方式（文件必须在 workspace 目录下）
+# Recommended: Use file method (file must be in workspace directory)
 curl -X POST http://localhost:3333/api/browser/execute_script `
   -H "Content-Type: application/json" `
   -d '@.claude/data/browser-control/workspace/script_request.json'
@@ -204,10 +204,10 @@ curl -X POST http://localhost:3333/api/browser/execute_script `
 
 #### Unix Shell (Bash/Zsh)
 
-通常对 UTF-8 支持较好，但**仍强烈建议使用文件中转法**以确保一致性。
+Generally better UTF-8 support, but **file transfer method is still strongly recommended** for consistency.
 
 ```bash
-# 推荐：使用文件方式（文件必须在 workspace 目录下）
+# Recommended: Use file method (file must be in workspace directory)
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d @.claude/data/browser-control/workspace/script_request.json
@@ -215,34 +215,34 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
 
 ---
 
-## 3. 返回值处理
+## 3. Return Value Handling
 
-### 3.1 可序列化类型
+### 3.1 Serializable Types
 
-| 类型 | 示例 | 说明 |
-|------|------|------|
-| string | `"hello"` | 直接返回 |
-| number | `42`, `3.14` | 直接返回 |
-| boolean | `true`, `false` | 直接返回 |
-| null | `null` | 直接返回 |
-| array | `[1, 2, 3]` | 元素必须可序列化 |
-| object | `{a: 1}` | 属性值必须可序列化 |
+| Type | Example | Notes |
+|------|---------|-------|
+| string | `"hello"` | Direct return |
+| number | `42`, `3.14` | Direct return |
+| boolean | `true`, `false` | Direct return |
+| null | `null` | Direct return |
+| array | `[1, 2, 3]` | Elements must be serializable |
+| object | `{a: 1}` | Property values must be serializable |
 
-### 3.2 不可序列化类型及解决方案
+### 3.2 Non-Serializable Types and Solutions
 
-| 类型 | 问题 | 解决方案 |
-|------|------|----------|
-| DOM 元素 | 返回 `{}` | 提取需要的属性 |
-| NodeList | 返回 `{}` | 使用 `Array.from()` 转换 |
-| Function | 无法序列化 | 不要返回函数 |
-| 循环引用 | 序列化报错 | 手动构建返回对象 |
-| undefined | 可能丢失 | 使用 `null` 替代 |
+| Type | Problem | Solution |
+|------|---------|----------|
+| DOM element | Returns `{}` | Extract needed properties |
+| NodeList | Returns `{}` | Convert with `Array.from()` |
+| Function | Cannot serialize | Don't return functions |
+| Circular reference | Serialization error | Manually construct return object |
+| undefined | May be lost | Use `null` instead |
 
 ```javascript
-// 错误：返回 DOM 元素
+// Wrong: Return DOM element
 document.querySelector('.user')
 
-// 正确：提取需要的数据
+// Correct: Extract needed data
 (() => {
   const el = document.querySelector('.user');
   if (!el) return null;
@@ -254,14 +254,14 @@ document.querySelector('.user')
 })()
 ```
 
-### 3.3 结构化返回值模式
+### 3.3 Structured Return Value Pattern
 
-推荐使用统一的返回值结构，便于调用方处理：
+Recommend using unified return value structure for easier caller handling:
 
 ```javascript
 (() => {
   try {
-    // 业务逻辑
+    // Business logic
     const data = /* ... */;
     return { success: true, data: data };
   } catch (error) {
@@ -272,11 +272,11 @@ document.querySelector('.user')
 
 ---
 
-## 4. 错误处理
+## 4. Error Handling
 
-### 4.1 try-catch 包裹
+### 4.1 try-catch Wrapper
 
-对于复杂操作，始终使用 try-catch：
+For complex operations, always use try-catch:
 
 ```javascript
 (() => {
@@ -291,19 +291,19 @@ document.querySelector('.user')
 })()
 ```
 
-### 4.2 可选链和空值合并
+### 4.2 Optional Chaining and Nullish Coalescing
 
-善用 ES2020 特性简化空值检查：
+Use ES2020 features to simplify null checks:
 
 ```javascript
-// 可选链 (?.) - 安全访问可能不存在的属性
+// Optional chaining (?.) - Safely access potentially non-existent properties
 document.querySelector('.title')?.innerText
 document.querySelector('.link')?.href
 
-// 空值合并 (??) - 提供默认值
+// Nullish coalescing (??) - Provide default value
 document.querySelector('.count')?.innerText ?? '0'
 
-// 组合使用
+// Combined usage
 (() => ({
   title: document.querySelector('h1')?.innerText ?? 'No title',
   author: document.querySelector('.author')?.innerText ?? 'Unknown',
@@ -311,28 +311,28 @@ document.querySelector('.count')?.innerText ?? '0'
 }))()
 ```
 
-### 4.3 统一错误返回格式
+### 4.3 Unified Error Return Format
 
 ```javascript
-// 推荐的错误返回格式
+// Recommended error return format
 {
   success: false,
-  error: "错误描述",
-  code: "ERROR_CODE",      // 可选：错误代码
-  details: { /* ... */ }   // 可选：详细信息
+  error: "Error description",
+  code: "ERROR_CODE",      // Optional: error code
+  details: { /* ... */ }   // Optional: detailed info
 }
 ```
 
 ---
 
-## 5. 异步操作
+## 5. Async Operations
 
-### 5.1 等待元素出现
+### 5.1 Wait for Element to Appear
 
-页面可能有延迟加载的内容，需要等待元素出现：
+Page may have lazy-loaded content, need to wait for element to appear:
 
 ```javascript
-// 简单的元素等待函数
+// Simple element wait function
 (() => {
   return new Promise((resolve) => {
     const check = () => {
@@ -344,32 +344,32 @@ document.querySelector('.count')?.innerText ?? '0'
       }
     };
     check();
-    // 超时处理
+    // Timeout handling
     setTimeout(() => resolve({ success: false, error: 'Timeout' }), 5000);
   });
 })()
 ```
 
-### 5.2 轮询检查模式
+### 5.2 Polling Check Pattern
 
-对于需要等待某个条件成立的场景：
+For scenarios requiring waiting for condition to be met:
 
 ```javascript
 (() => {
   return new Promise((resolve) => {
     let attempts = 0;
-    const maxAttempts = 50;  // 最多检查 50 次
-    const interval = 100;     // 每 100ms 检查一次
+    const maxAttempts = 50;  // Max 50 checks
+    const interval = 100;     // Check every 100ms
 
     const check = () => {
       attempts++;
       const loading = document.querySelector('.loading');
       
       if (!loading) {
-        // 加载完成
+        // Loading complete
         resolve({ success: true, data: document.body.innerText });
       } else if (attempts >= maxAttempts) {
-        // 超时
+        // Timeout
         resolve({ success: false, error: 'Loading timeout' });
       } else {
         setTimeout(check, interval);
@@ -383,9 +383,9 @@ document.querySelector('.count')?.innerText ?? '0'
 
 ---
 
-## 6. 常用模板
+## 6. Common Templates
 
-### 6.1 安全提取数据模板
+### 6.1 Safe Data Extraction Template
 
 ```javascript
 (() => {
@@ -408,22 +408,22 @@ document.querySelector('.count')?.innerText ?? '0'
 })()
 ```
 
-### 6.2 安全表单操作模板
+### 6.2 Safe Form Operation Template
 
 ```javascript
 (() => {
   try {
-    // 填写表单
+    // Fill form
     const input = document.querySelector('input[name="search"]');
     if (!input) return { success: false, error: 'Input not found' };
     
-    // 使用 Unicode 转义处理中文
+    // Use Unicode escape for Chinese
     input.value = '\u641c\u7d22\u5173\u952e\u8bcd';  // "搜索关键词"
     
-    // 触发 input 事件（某些框架需要）
+    // Trigger input event (needed by some frameworks)
     input.dispatchEvent(new Event('input', { bubbles: true }));
     
-    // 点击提交
+    // Click submit
     const btn = document.querySelector('button[type="submit"]');
     if (!btn) return { success: false, error: 'Submit button not found' };
     
@@ -436,7 +436,7 @@ document.querySelector('.count')?.innerText ?? '0'
 })()
 ```
 
-### 6.3 滚动加载模板
+### 6.3 Scroll Load Template
 
 ```javascript
 (() => {
@@ -445,24 +445,24 @@ document.querySelector('.count')?.innerText ?? '0'
       const prevHeight = document.body.scrollHeight;
       window.scrollTo(0, document.body.scrollHeight);
       
-      // 等待新内容加载
+      // Wait for new content to load
       await new Promise(r => setTimeout(r, 1000));
       
       const newHeight = document.body.scrollHeight;
       if (newHeight === prevHeight) {
-        // 已到底部，收集数据
+        // Reached bottom, collect data
         const items = Array.from(document.querySelectorAll('.item'))
           .map(el => el.innerText);
         resolve({ success: true, data: items, count: items.length });
       } else {
-        // 继续滚动
+        // Continue scrolling
         scrollStep();
       }
     };
     
     scrollStep();
     
-    // 超时保护
+    // Timeout protection
     setTimeout(() => {
       const items = Array.from(document.querySelectorAll('.item'))
         .map(el => el.innerText);
@@ -472,7 +472,7 @@ document.querySelector('.count')?.innerText ?? '0'
 })()
 ```
 
-### 6.4 页面信息提取模板
+### 6.4 Page Info Extraction Template
 
 ```javascript
 (() => ({
@@ -494,71 +494,71 @@ document.querySelector('.count')?.innerText ?? '0'
 
 ---
 
-## 7. 常见问题
+## 7. Common Questions
 
-### Q1: 脚本执行后返回空对象 `{}`
+### Q1: Script Returns Empty Object `{}`
 
-**原因**：返回了不可序列化的值（如 DOM 元素）
+**Cause**: Returned non-serializable value (like DOM element)
 
-**解决**：提取需要的属性，返回普通对象
+**Solution**: Extract needed properties, return plain object
 
 ```javascript
-// 错误：返回 DOM
+// Wrong: Return DOM
 document.querySelector('.item')
 
-// 正确：返回数据
+// Correct: Return data
 (() => {
   const el = document.querySelector('.item');
   return el ? { text: el.innerText, html: el.innerHTML } : null;
 })()
 ```
 
-### Q2: 中文显示为乱码或请求失败
+### Q2: Chinese Shows as Garbled or Request Fails
 
-**原因**：Shell 对中文编码处理不一致
+**Cause**: Shell handles Chinese encoding inconsistently
 
-**解决**：使用文件中转法（强烈推荐）
+**Solution**: Use file transfer method (strongly recommended)
 
-1. 使用 Write 工具创建 JSON 请求文件
-2. 使用 `curl -d @filename` 发送请求
+1. Use Write tool to create JSON request file
+2. Use `curl -d @filename` to send request
 
-详见本文档「2. 编码处理」章节。
+See "2. Encoding Handling" section in this document.
 
-**备选方案**：Unicode 转义
+**Alternative**: Unicode escape
 
 ```javascript
-// 原始：直接使用中文
+// Original: Direct Chinese
 '搜索'
 
-// 转义：Unicode 格式
+// Escaped: Unicode format
 '\u641c\u7d22'
 ```
 
-### Q3: 元素不存在导致脚本报错
+### Q3: Script Errors Due to Non-Existent Element
 
-**原因**：直接访问可能为 null 的元素属性
+**Cause**: Direct access to potentially null element property
 
-**解决**：使用可选链或先检查
+**Solution**: Use optional chaining or check first
 
 ```javascript
-// 危险
+// Dangerous
 document.querySelector('.btn').click()
 
-// 安全
+// Safe
 document.querySelector('.btn')?.click()
 ```
 
-### Q4: 异步内容获取不到
+### Q4: Cannot Get Async Content
 
-**原因**：内容是动态加载的，执行时还未出现
+**Cause**: Content is dynamically loaded, not present at execution time
 
-**解决**：使用等待机制（参考第 5 节）
+**Solution**: Use wait mechanism (see Section 5)
 
-### Q5: 表单提交后数据没变化
+### Q5: No Change After Form Submission
 
-**原因**：现代框架需要触发事件才能识别值变化
+**Cause**: Modern frameworks need events triggered to recognize value changes
 
-**解决**：设置值后触发 input 事件
+**Solution**: Trigger input event after setting value
 
 ```javascript
 input.value = 'new value';
@@ -567,102 +567,102 @@ input.dispatchEvent(new Event('input', { bubbles: true }));
 
 ---
 
-## 8. 视觉反馈
+## 8. Visual Feedback
 
-### 8.1 功能介绍
+### 8.1 Feature Introduction
 
-视觉反馈功能可以在脚本执行时**高亮显示正在操作的页面元素**，让用户直观看到脚本的操作目标，便于调试和确认脚本行为。
+Visual feedback feature can **highlight page elements being operated on** during script execution, allowing users to visually see the script's operation targets, useful for debugging and confirming script behavior.
 
-**效果类型**：
-- **边框高亮**：蓝色边框标识目标元素
-- **脉冲动画**：操作进行中的动态提示
-- **状态变色**：成功显示绿色，失败显示红色
-- **序号角标**：批量操作时显示元素序号
+**Effect Types**:
+- **Border highlight**: Blue border identifies target element
+- **Pulse animation**: Dynamic indication during operation
+- **Status color change**: Green for success, red for failure
+- **Number badge**: Shows element sequence number in batch operations
 
-### 8.2 启用方式
+### 8.2 How to Enable
 
-**执行脚本时始终添加 `--visual-feedback` 参数**（或简写 `--vf`）：
+**Always add `--visual-feedback` parameter (or shorthand `--vf`) when executing scripts**:
 
 ```bash
-# 脚本文件必须在 workspace 目录下
+# Script file must be in workspace directory
 node .claude/skills/browser-control/scripts/run_script.js --tabId 123456789 .claude/data/browser-control/workspace/my_script.js --visual-feedback
 ```
 
-> **重要**：视觉反馈是推荐的默认行为，所有脚本执行命令都应包含此参数，让用户能直观看到脚本的操作目标。
+> **Important**: Visual feedback is the recommended default behavior. All script execution commands should include this parameter so users can visually see the script's operation targets.
 
-启用后，脚本中可以直接使用 `__bcHighlight` API。
+When enabled, scripts can directly use the `__bcHighlight` API.
 
-### 8.3 API 参考
+### 8.3 API Reference
 
-#### 显示高亮
+#### Show Highlight
 
 ```javascript
 __bcHighlight.show(element, options)
 ```
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| element | HTMLElement | 目标 DOM 元素 |
-| options.label | string | 标签文字（如 "正在点击..."） |
-| options.pulse | boolean | 是否使用脉冲动画 |
-| options.badge | number | 序号角标 |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| element | HTMLElement | Target DOM element |
+| options.label | string | Label text (e.g., "Clicking...") |
+| options.pulse | boolean | Whether to use pulse animation |
+| options.badge | number | Number badge |
 
-#### 隐藏高亮
+#### Hide Highlight
 
 ```javascript
 __bcHighlight.hide(element)
 ```
 
-#### 成功/失败反馈
+#### Success/Failure Feedback
 
 ```javascript
-__bcHighlight.success(element, duration)  // 绿色反馈
-__bcHighlight.fail(element, duration)     // 红色反馈
+__bcHighlight.success(element, duration)  // Green feedback
+__bcHighlight.fail(element, duration)     // Red feedback
 ```
 
-`duration` 默认 1500ms，设为 0 则不自动隐藏。
+`duration` defaults to 1500ms, set to 0 to not auto-hide.
 
-#### 自动包装操作
+#### Auto-Wrap Operations
 
 ```javascript
 __bcHighlight.withFeedback(element, fn, options)
 ```
 
-自动：显示高亮 → 执行操作 → 根据结果变色 → 隐藏
+Auto: Show highlight → Execute operation → Change color based on result → Hide
 
 ```javascript
-// 示例
+// Example
 await __bcHighlight.withFeedback(button, () => {
   button.click();
   return { success: true };
-}, { label: '点击按钮' });
+}, { label: 'Click button' });
 ```
 
-#### 批量操作
+#### Batch Operations
 
 ```javascript
 __bcHighlight.batch(elements, fn, options)
 ```
 
-自动为每个元素添加序号，逐个执行并显示进度。
+Automatically adds sequence number to each element, executes sequentially and shows progress.
 
 ```javascript
-// 示例
+// Example
 const items = document.querySelectorAll('.item');
 const results = await __bcHighlight.batch(items, (el, index) => {
   return el.innerText;
 }, { delay: 200 });
 ```
 
-#### 清理所有高亮
+#### Clear All Highlights
 
 ```javascript
 __bcHighlight.cleanup()
 ```
 
-### 8.4 使用示例
+### 8.4 Usage Examples
 
-#### 示例 1：点击按钮
+#### Example 1: Click Button
 
 ```javascript
 (() => {
@@ -672,11 +672,11 @@ __bcHighlight.cleanup()
   return __bcHighlight.withFeedback(btn, () => {
     btn.click();
     return { success: true };
-  }, { label: '点击提交' });
+  }, { label: 'Click submit' });
 })()
 ```
 
-#### 示例 2：批量提取数据
+#### Example 2: Batch Extract Data
 
 ```javascript
 (() => {
@@ -693,7 +693,7 @@ __bcHighlight.cleanup()
 })()
 ```
 
-#### 示例 3：表单填写
+#### Example 3: Fill Form
 
 ```javascript
 (() => {
@@ -701,64 +701,64 @@ __bcHighlight.cleanup()
   const btn = document.querySelector('button[type="submit"]');
   
   return (async () => {
-    // 填写输入框
+    // Fill input
     await __bcHighlight.withFeedback(input, () => {
-      input.value = '搜索关键词';
+      input.value = 'search keyword';
       input.dispatchEvent(new Event('input', { bubbles: true }));
       return true;
-    }, { label: '填写搜索框' });
+    }, { label: 'Fill search box' });
     
-    // 等待一下
+    // Wait a moment
     await new Promise(r => setTimeout(r, 300));
     
-    // 点击提交
+    // Click submit
     await __bcHighlight.withFeedback(btn, () => {
       btn.click();
       return true;
-    }, { label: '点击搜索' });
+    }, { label: 'Click search' });
     
     return { success: true };
   })();
 })()
 ```
 
-### 8.5 模板文件
+### 8.5 Template Files
 
-提供了带视觉反馈的脚本模板：
+Script templates with visual feedback are provided:
 
-| 模板 | 用途 |
-|------|------|
-| `templates/extract_with_feedback.js` | 数据提取（带高亮） |
-| `templates/form_with_feedback.js` | 表单操作（带高亮） |
-| `templates/click_with_feedback.js` | 点击操作（带高亮） |
+| Template | Purpose |
+|----------|---------|
+| `templates/extract_with_feedback.js` | Data extraction (with highlight) |
+| `templates/form_with_feedback.js` | Form operations (with highlight) |
+| `templates/click_with_feedback.js` | Click operations (with highlight) |
 
-### 8.6 注意事项
+### 8.6 Notes
 
-1. **不影响页面**：视觉反馈使用独立的覆盖层，不会修改原页面元素样式
-2. **自动清理**：操作完成后会自动清理所有注入的 DOM 和样式
-3. **性能开销**：视觉反馈会增加少量代码体积，仅在需要调试时启用
-4. **异步操作**：`withFeedback` 和 `batch` 返回 Promise，需要使用 `await`
+1. **Doesn't affect page**: Visual feedback uses independent overlay, doesn't modify original page element styles
+2. **Auto-cleanup**: All injected DOM and styles are automatically cleaned up after operation completes
+3. **Performance overhead**: Visual feedback adds small code overhead, enable only when debugging
+4. **Async operations**: `withFeedback` and `batch` return Promise, require `await`
 
 ---
 
-## 更新日志
+## Changelog
 
 ### v1.2.0 (2026-01-12)
-- 新增视觉反馈功能章节
-- 新增 __bcHighlight API 参考
-- 新增 3 个视觉反馈使用示例
-- 新增 3 个带视觉反馈的脚本模板
+- Added visual feedback feature section
+- Added __bcHighlight API reference
+- Added 3 visual feedback usage examples
+- Added 3 script templates with visual feedback
 
 ### v1.1.0 (2026-01-11)
-- 重构编码处理章节：文件中转法提升为首选方案
-- Unicode 转义降为备选方案
-- 新增方案对比表格
-- 更新 Q2 解决方案为文件中转法
-- 增加辅助脚本使用说明
+- Restructured encoding handling section: File transfer method promoted to preferred solution
+- Unicode escape demoted to alternative method
+- Added method comparison table
+- Updated Q2 solution to file transfer method
+- Added helper script usage instructions
 
 ### v1.0.0 (2026-01-11)
-- 初始版本
-- 基本原则、编码处理、返回值处理、错误处理
-- 异步操作指南
-- 4 个常用模板
-- 5 个常见问题解答
+- Initial version
+- Basic principles, encoding handling, return value handling, error handling
+- Async operations guide
+- 4 common templates
+- 5 common Q&A

@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 
 /**
- * search_library.js - Search Script Library
+ * search_library.js - 搜索脚本库
  * 
- * Search existing library before creating new scripts to find reusable scripts
+ * 在创建新脚本前搜索现有库，找到可复用的脚本
  * 
- * Usage:
- *   # Auto-match site by URL
+ * 用法：
+ *   # 按 URL 自动匹配站点
  *   node search_library.js --url "https://www.xiaohongshu.com/..."
  * 
- *   # Search by domain + keywords
- *   node search_library.js --domain xiaohongshu.com --keywords "note,extract"
+ *   # 按域名 + 关键词搜索
+ *   node search_library.js --domain xiaohongshu.com --keywords "笔记,提取"
  * 
- *   # Search common scripts
+ *   # 搜索通用脚本
  *   node search_library.js --common --keywords "scroll"
  * 
- *   # List all scripts
+ *   # 列出所有脚本
  *   node search_library.js --list
  * 
  * @created 2026-01-11
@@ -33,9 +33,9 @@ const {
 } = require('./paths');
 
 /**
- * Parse script file metadata
- * @param {string} filePath - Script file path
- * @returns {Object|null} Metadata object
+ * 解析脚本文件的元信息
+ * @param {string} filePath - 脚本文件路径
+ * @returns {Object|null} 元信息对象
  */
 function parseScriptMeta(filePath) {
   try {
@@ -50,7 +50,7 @@ function parseScriptMeta(filePath) {
       filePath: filePath
     };
     
-    // Parse JSDoc style metadata
+    // 解析 JSDoc 风格的元信息
     const nameMatch = content.match(/@name\s+(.+)/);
     const purposeMatch = content.match(/@purpose\s+(.+)/);
     const keywordsMatch = content.match(/@keywords\s+(.+)/);
@@ -74,9 +74,9 @@ function parseScriptMeta(filePath) {
 }
 
 /**
- * Get metadata for all scripts in directory
- * @param {string} dirPath - Directory path
- * @returns {Array} Script metadata array
+ * 获取目录下所有脚本的元信息
+ * @param {string} dirPath - 目录路径
+ * @returns {Array} 脚本元信息数组
  */
 function getScriptsInDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -100,9 +100,9 @@ function getScriptsInDir(dirPath) {
 }
 
 /**
- * Read site metadata
- * @param {string} domain - Domain name
- * @returns {Object|null} Site metadata
+ * 读取站点元信息
+ * @param {string} domain - 域名
+ * @returns {Object|null} 站点元信息
  */
 function getSiteMeta(domain) {
   const siteFile = getSiteMetaFile(domain);
@@ -117,9 +117,9 @@ function getSiteMeta(domain) {
 }
 
 /**
- * Find domain by alias
- * @param {string} alias - Alias
- * @returns {string|null} Matching domain
+ * 通过别名查找域名
+ * @param {string} alias - 别名
+ * @returns {string|null} 匹配的域名
  */
 function findDomainByAlias(alias) {
   const libraryDir = getLibraryDir();
@@ -141,10 +141,10 @@ function findDomainByAlias(alias) {
 }
 
 /**
- * Calculate keyword match score
- * @param {Array} scriptKeywords - Script keywords
- * @param {Array} searchKeywords - Search keywords
- * @returns {number} Match score 0-100
+ * 计算关键词匹配度
+ * @param {Array} scriptKeywords - 脚本关键词
+ * @param {Array} searchKeywords - 搜索关键词
+ * @returns {number} 匹配度 0-100
  */
 function calculateMatchScore(scriptKeywords, searchKeywords) {
   if (!searchKeywords.length || !scriptKeywords.length) {
@@ -168,13 +168,13 @@ function calculateMatchScore(scriptKeywords, searchKeywords) {
 }
 
 /**
- * Search scripts
- * @param {Object} options - Search options
+ * 搜索脚本
+ * @param {Object} options - 搜索选项
  * @param {string} options.url - URL
- * @param {string} options.domain - Domain
- * @param {Array} options.keywords - Keywords
- * @param {boolean} options.common - Only search common scripts
- * @returns {Array} Matching script list
+ * @param {string} options.domain - 域名
+ * @param {Array} options.keywords - 关键词
+ * @param {boolean} options.common - 只搜索通用脚本
+ * @returns {Array} 匹配的脚本列表
  */
 function searchScripts(options) {
   ensureDataDir();
@@ -182,13 +182,13 @@ function searchScripts(options) {
   const { url, domain, keywords = [], common = false } = options;
   const results = [];
   
-  // Determine target domain
+  // 确定要搜索的域名
   let targetDomain = domain;
   if (url && !targetDomain) {
     targetDomain = extractDomain(url);
   }
   
-  // Try to find by alias
+  // 尝试通过别名查找
   if (targetDomain) {
     const actualDomain = findDomainByAlias(targetDomain);
     if (actualDomain) {
@@ -198,7 +198,7 @@ function searchScripts(options) {
   
   const searchKeywords = keywords;
   
-  // Search specific domain directory
+  // 搜索特定域名目录
   if (targetDomain && !common) {
     const domainDir = getDomainDir(targetDomain);
     const scripts = getScriptsInDir(domainDir);
@@ -206,7 +206,7 @@ function searchScripts(options) {
     for (const script of scripts) {
       const score = searchKeywords.length > 0
         ? calculateMatchScore(script.keywords, searchKeywords)
-        : 50; // Base score when no keywords
+        : 50; // 无关键词时给基础分
       
       results.push({
         ...script,
@@ -217,7 +217,7 @@ function searchScripts(options) {
     }
   }
   
-  // Search common scripts
+  // 搜索通用脚本
   if (common || !targetDomain || results.length === 0) {
     const commonDir = getCommonDir();
     const scripts = getScriptsInDir(commonDir);
@@ -225,7 +225,7 @@ function searchScripts(options) {
     for (const script of scripts) {
       const score = searchKeywords.length > 0
         ? calculateMatchScore(script.keywords, searchKeywords)
-        : 30; // Lower base score for common scripts
+        : 30; // 通用脚本基础分较低
       
       results.push({
         ...script,
@@ -236,10 +236,10 @@ function searchScripts(options) {
     }
   }
   
-  // Sort by match score
+  // 按匹配度排序
   results.sort((a, b) => b.matchScore - a.matchScore);
   
-  // Filter low score results (if keyword search)
+  // 过滤低匹配度结果（如果有关键词搜索）
   if (searchKeywords.length > 0) {
     return results.filter(r => r.matchScore > 0);
   }
@@ -248,8 +248,8 @@ function searchScripts(options) {
 }
 
 /**
- * List all scripts
- * @returns {Object} Scripts grouped by domain
+ * 列出所有脚本
+ * @returns {Object} 按域名分组的脚本列表
  */
 function listAllScripts() {
   ensureDataDir();
@@ -269,7 +269,7 @@ function listAllScripts() {
     
     const scripts = getScriptsInDir(dirPath);
     if (scripts.length > 0) {
-      const siteMeta = dir === '_common' ? { name: 'Common' } : getSiteMeta(dir);
+      const siteMeta = dir === '_common' ? { name: '通用' } : getSiteMeta(dir);
       result[dir] = {
         name: siteMeta?.name || dir,
         scripts: scripts
@@ -281,69 +281,69 @@ function listAllScripts() {
 }
 
 /**
- * Print search results
- * @param {Array} results - Search results
- * @param {string} domain - Searched domain
+ * 打印搜索结果
+ * @param {Array} results - 搜索结果
+ * @param {string} domain - 搜索的域名
  */
 function printResults(results, domain) {
   if (results.length === 0) {
-    console.log('\nNo matching scripts found.');
-    console.log('Tip: You can create a new script, and it will be auto-archived after successful execution.');
+    console.log('\n未找到匹配的脚本。');
+    console.log('提示：可以创建新脚本，执行成功后会自动归档到库中。');
     return;
   }
   
-  console.log(`\nFound ${results.length} matching script(s):\n`);
+  console.log(`\n找到 ${results.length} 个匹配脚本：\n`);
   
   results.forEach((script, index) => {
-    const domainLabel = script.domain === '_common' ? 'Common' : script.domain;
-    console.log(`${index + 1}. ${script.name} (Match: ${script.matchScore}%)`);
-    console.log(`   Purpose: ${script.purpose || 'No description'}`);
-    console.log(`   Site: ${domainLabel}`);
-    console.log(`   Keywords: ${script.keywords.join(', ') || 'None'}`);
-    console.log(`   Path: ${script.filePath}`);
-    console.log(`   Usage count: ${script.usageCount}`);
+    const domainLabel = script.domain === '_common' ? '通用' : script.domain;
+    console.log(`${index + 1}. ${script.name} (匹配度: ${script.matchScore}%)`);
+    console.log(`   用途: ${script.purpose || '未描述'}`);
+    console.log(`   站点: ${domainLabel}`);
+    console.log(`   关键词: ${script.keywords.join(', ') || '无'}`);
+    console.log(`   路径: ${script.filePath}`);
+    console.log(`   使用次数: ${script.usageCount}`);
     console.log('');
   });
   
-  console.log('Usage:');
-  console.log('  node scripts/run_script.js --from-library <domain/script.js> --tabId <tabId>');
+  console.log('使用方式：');
+  console.log('  node scripts/run_script.js --from-library <域名/脚本名.js> --tabId <tabId>');
 }
 
 /**
- * Print all scripts list
- * @param {Object} allScripts - All scripts
+ * 打印所有脚本列表
+ * @param {Object} allScripts - 所有脚本
  */
 function printAllScripts(allScripts) {
   const domains = Object.keys(allScripts);
   
   if (domains.length === 0) {
-    console.log('\nScript library is empty.');
+    console.log('\n脚本库为空。');
     return;
   }
   
   let totalScripts = 0;
   
-  console.log('\n=== Script Library Contents ===\n');
+  console.log('\n=== 脚本库内容 ===\n');
   
   for (const domain of domains) {
     const { name, scripts } = allScripts[domain];
     totalScripts += scripts.length;
     
-    console.log(`[${name}] (${domain})`);
+    console.log(`【${name}】(${domain})`);
     
     for (const script of scripts) {
-      console.log(`  - ${script.name}: ${script.purpose || 'No description'}`);
+      console.log(`  - ${script.name}: ${script.purpose || '未描述'}`);
     }
     
     console.log('');
   }
   
-  console.log(`Total: ${domains.length} site(s), ${totalScripts} script(s)`);
+  console.log(`共 ${domains.length} 个站点，${totalScripts} 个脚本`);
 }
 
 /**
- * Parse command line arguments
- * @returns {Object} Parsed arguments
+ * 解析命令行参数
+ * @returns {Object} 解析后的参数
  */
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -388,41 +388,41 @@ function parseArgs() {
 }
 
 /**
- * Print usage instructions
+ * 打印使用说明
  */
 function printUsage() {
   console.log(`
-Search Script Library
+搜索脚本库
 
-Usage:
-  node search_library.js [options]
+用法:
+  node search_library.js [选项]
 
-Options:
-  --url <url>           Auto-match site by URL
-  --domain <domain>     Search by specific domain
-  --keywords <kw1,kw2>  Search by keywords (comma-separated)
-  --common              Only search common scripts
-  --list                List all scripts
-  --json                Output in JSON format
-  --help, -h            Show this help message
+选项:
+  --url <url>           按 URL 自动匹配站点
+  --domain <domain>     指定域名搜索
+  --keywords <kw1,kw2>  按关键词搜索（逗号分隔）
+  --common              只搜索通用脚本
+  --list                列出所有脚本
+  --json                以 JSON 格式输出
+  --help, -h            显示此帮助信息
 
-Examples:
-  # Search by URL
+示例:
+  # 按 URL 搜索
   node search_library.js --url "https://www.xiaohongshu.com/explore/xxx"
 
-  # Search by domain + keywords
-  node search_library.js --domain xiaohongshu.com --keywords "note,extract"
+  # 按域名 + 关键词搜索
+  node search_library.js --domain xiaohongshu.com --keywords "笔记,提取"
 
-  # Search common scripts
+  # 搜索通用脚本
   node search_library.js --common --keywords "scroll"
 
-  # List all scripts
+  # 列出所有脚本
   node search_library.js --list
 `);
 }
 
 /**
- * Main function
+ * 主函数
  */
 function main() {
   const options = parseArgs();
@@ -442,7 +442,7 @@ function main() {
     return;
   }
   
-  // Execute search
+  // 执行搜索
   const results = searchScripts(options);
   
   if (options.json) {
@@ -453,7 +453,7 @@ function main() {
   }
 }
 
-// Export functions for other modules
+// 导出函数供其他模块使用
 module.exports = {
   searchScripts,
   listAllScripts,
@@ -464,7 +464,7 @@ module.exports = {
   calculateMatchScore
 };
 
-// Execute main function if run directly
+// 如果直接运行则执行主函数
 if (require.main === module) {
   main();
 }

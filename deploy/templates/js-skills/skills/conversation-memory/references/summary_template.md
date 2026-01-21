@@ -1,120 +1,120 @@
-# 摘要模板
+# Summary Template
 
-此模板用于生成每个对话记忆的 summary.md 文件。
+This template is used to generate the summary.md file for each conversation memory.
 
-## 模板内容
+## Template Content
 
 ```markdown
-# 对话记忆：{主题标题}
+# Conversation Memory: {Topic Title}
 
-## 元信息
+## Metadata
 
-- **时间**：{YYYY-MM-DD HH:MM}
-- **持续**：约 {N} 分钟
-- **对话轮次**：{N} 轮
-- **关键词**：{关键词1}, {关键词2}, {关键词3}
+- **Time**: {YYYY-MM-DD HH:MM}
+- **Duration**: ~{N} minutes
+- **Conversation Rounds**: {N} rounds
+- **Keywords**: {keyword1}, {keyword2}, {keyword3}
 
-## 主题摘要
+## Topic Summary
 
-{用 1-2 段话概括这次对话的主题和背景}
+{1-2 paragraphs summarizing the topic and background of this conversation}
 
-## 关键决策
+## Key Decisions
 
-1. {决策1}
-2. {决策2}
+1. {Decision 1}
+2. {Decision 2}
 3. ...
 
-## 重要结论
+## Important Conclusions
 
-- {结论1}
-- {结论2}
+- {Conclusion 1}
+- {Conclusion 2}
 - ...
 
-## 待办事项
+## TODO Items
 
-- [ ] {待办1}
-- [ ] {待办2}
+- [ ] {TODO 1}
+- [ ] {TODO 2}
 - ...
 
-（如无待办事项可删除此节）
+(Remove this section if there are no TODO items)
 
-## 相关文件
+## Related Files
 
-- `{文件路径1}` - {简要说明}
-- `{文件路径2}` - {简要说明}
+- `{file path 1}` - {brief description}
+- `{file path 2}` - {brief description}
 - ...
 
-（如无相关文件可删除此节）
+(Remove this section if there are no related files)
 
-## 溯源
+## Source
 
-如需查看完整原始对话，请参阅 [conversation.md](conversation.md)
+For full original conversation, see [conversation.md](conversation.md)
 ```
 
-## 填写说明
+## Field Instructions
 
-### 主题标题
+### Topic Title
 
-用简短的词语描述对话主题，例如：
-- "记忆系统设计"
-- "Kaichi 工作流重构"
-- "API 接口优化"
+Use brief words to describe the conversation topic, for example:
+- "Memory System Design"
+- "Kaichi Workflow Refactor"
+- "API Interface Optimization"
 
-### 关键词
+### Keywords
 
-**这是最重要的字段**，决定了记忆能否被正确召回。
+**This is the most important field**, determining whether the memory can be correctly recalled.
 
-要求：
-- 提取 3-8 个关键词
-- 包含主题相关的核心术语
-- 便于后续搜索和匹配
+Requirements:
+- Extract 3-8 keywords
+- Include core terms related to the topic
+- Facilitate subsequent search and matching
 
-示例：
+Example:
 ```
-skills, 记忆, 召回, 索引, 渐进式加载
+skills, memory, recall, index, progressive loading
 ```
 
-### 元信息
+### Metadata
 
-- **时间**：对话开始时间
-- **持续**：大致估算的对话时长
-- **对话轮次**：用户发言次数
+- **Time**: Conversation start time
+- **Duration**: Estimated conversation duration
+- **Conversation Rounds**: Number of user messages
 
-### 主题摘要
+### Topic Summary
 
-用自然语言描述对话的核心内容，便于快速了解这次对话讨论了什么。
+Use natural language to describe the core content of the conversation, for quick understanding of what was discussed.
 
-### 关键决策
+### Key Decisions
 
-列出对话中做出的重要决定，使用动词开头：
-- "采用 xxx 方案"
-- "决定使用 xxx"
-- "选择 xxx 而非 yyy"
+List important decisions made during the conversation, start with verbs:
+- "Adopted xxx solution"
+- "Decided to use xxx"
+- "Chose xxx over yyy"
 
-### 重要结论
+### Important Conclusions
 
-列出对话得出的结论或成果：
-- 设计方案
-- 问题的答案
-- 达成的共识
+List conclusions or outcomes from the conversation:
+- Design solutions
+- Answers to questions
+- Reached consensus
 
-### 待办事项
+### TODO Items
 
-如果对话中提到了后续需要做的事情，在此记录。
+If follow-up tasks were mentioned during the conversation, record them here.
 
-### 相关文件
+### Related Files
 
-列出对话中涉及的代码文件、文档、配置等路径。
+List code files, documentation, configurations, etc. involved in the conversation.
 
-## 与旧版本的区别
+## Differences from Old Version
 
-新版 summary.md 与旧版 SKILL.md 的区别：
+Differences between new summary.md and old SKILL.md:
 
-| 项目 | 旧版 SKILL.md | 新版 summary.md |
+| Item | Old SKILL.md | New summary.md |
 |------|--------------|----------------|
-| YAML 前置元数据 | 有 | **无** |
-| 作为独立技能 | 是 | **否** |
-| 自动加载 | 元数据被加载 | **不自动加载** |
-| 索引方式 | Skills 机制 | **主技能索引表** |
+| YAML frontmatter | Yes | **No** |
+| As standalone skill | Yes | **No** |
+| Auto-loaded | Metadata loaded | **Not auto-loaded** |
+| Indexing method | Skills mechanism | **Main skill index table** |
 
-新版本通过主技能的索引表来管理记忆，而不是让每个记忆成为独立技能。
+The new version manages memories through the main skill's index table, rather than making each memory a standalone skill.

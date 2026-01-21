@@ -1,5 +1,5 @@
 ---
-title: Browser Control 故障排查
+title: Browser Control Troubleshooting
 version: 1.0.0
 created: 2026-01-10
 updated: 2026-01-10
@@ -7,24 +7,24 @@ author: agent-kaichi
 status: stable
 ---
 
-# Browser Control 故障排查
+# Browser Control Troubleshooting
 
-本文档提供常见问题的诊断方法和解决方案。
+This document provides diagnostic methods and solutions for common problems.
 
 ---
 
-## 1. 服务不可用
+## 1. Service Unavailable
 
-### 症状
+### Symptoms
 
 ```bash
 curl http://localhost:3333/api/browser/status
-# 返回: curl: (7) Failed to connect to localhost port 3333
+# Returns: curl: (7) Failed to connect to localhost port 3333
 ```
 
-### 诊断步骤
+### Diagnostic Steps
 
-#### 1.1 检查端口是否被占用
+#### 1.1 Check if Port is Occupied
 
 **Windows**:
 
@@ -38,9 +38,9 @@ netstat -ano | findstr :3333
 lsof -i :3333
 ```
 
-如果端口被占用，查看占用进程的 PID 并决定是否结束。
+If the port is occupied, check the PID of the occupying process and decide whether to terminate it.
 
-#### 1.2 检查服务进程是否运行
+#### 1.2 Check if Service Process is Running
 
 **Windows**:
 
@@ -55,38 +55,38 @@ tasklist | findstr "node"
 ps aux | grep -E "electron|node"
 ```
 
-#### 1.3 检查日志
+#### 1.3 Check Logs
 
-查看 Browser Control Manager 应用的日志面板，或检查控制台输出。
+View the Browser Control Manager application's log panel or check console output.
 
-### 解决方案
+### Solutions
 
-1. **端口被占用**: 结束占用进程或修改配置使用其他端口
-2. **服务未启动**: 启动 Browser Control Manager 应用
-3. **服务崩溃**: 重启应用，检查错误日志
+1. **Port occupied**: Terminate the occupying process or modify configuration to use a different port
+2. **Service not started**: Start the Browser Control Manager application
+3. **Service crashed**: Restart the application, check error logs
 
 ---
 
-## 2. 无标签页数据
+## 2. No Tab Data
 
-### 症状
+### Symptoms
 
 ```bash
 curl http://localhost:3333/api/browser/tabs
-# 返回: {"status":"success","tabs":[],"needsCallback":false}
+# Returns: {"status":"success","tabs":[],"needsCallback":false}
 ```
 
-标签页列表为空，但浏览器中明明有打开的页面。
+Tab list is empty, but pages are clearly open in the browser.
 
-### 诊断步骤
+### Diagnostic Steps
 
-#### 2.1 检查扩展连接状态
+#### 2.1 Check Extension Connection Status
 
 ```bash
 curl http://localhost:3333/api/browser/status
 ```
 
-查看返回中的 `activeConnections`：
+Check `activeConnections` in the response:
 
 ```json
 {
@@ -100,51 +100,51 @@ curl http://localhost:3333/api/browser/status
 }
 ```
 
-如果 `activeConnections: 0`，说明浏览器扩展未连接。
+If `activeConnections: 0`, the browser extension is not connected.
 
-#### 2.2 检查浏览器扩展是否安装
+#### 2.2 Check if Browser Extension is Installed
 
-1. 打开浏览器的扩展管理页面
-2. 确认 Browser Control 扩展已安装
-3. 确认扩展已启用
+1. Open browser's extension management page
+2. Confirm Browser Control extension is installed
+3. Confirm extension is enabled
 
-#### 2.3 检查扩展是否正确配置
+#### 2.3 Check if Extension is Configured Correctly
 
-扩展需要配置正确的 WebSocket 地址（默认 `ws://localhost:8080`）。
+Extension needs to be configured with the correct WebSocket address (default `ws://localhost:8080`).
 
-### 解决方案
+### Solutions
 
-1. **扩展未安装**: 安装浏览器扩展
-2. **扩展已禁用**: 启用扩展
-3. **连接地址错误**: 在扩展设置中配置正确的 WebSocket 地址
-4. **连接断开**: 刷新扩展或重启浏览器
+1. **Extension not installed**: Install the browser extension
+2. **Extension disabled**: Enable the extension
+3. **Wrong connection address**: Configure correct WebSocket address in extension settings
+4. **Connection dropped**: Refresh the extension or restart browser
 
 ---
 
-## 3. 脚本执行失败
+## 3. Script Execution Failed
 
-### 症状
+### Symptoms
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123, "code": "document.title"}'
-# 返回成功，但回调结果中有错误
+# Returns success, but callback result contains error
 ```
 
-### 诊断步骤
+### Diagnostic Steps
 
-#### 3.1 检查 tabId 是否有效
+#### 3.1 Check if tabId is Valid
 
 ```bash
 curl http://localhost:3333/api/browser/tabs
 ```
 
-确认使用的 tabId 存在于返回的标签页列表中。
+Confirm the tabId you're using exists in the returned tab list.
 
-#### 3.2 检查页面是否加载完成
+#### 3.2 Check if Page has Finished Loading
 
-某些页面可能还在加载中。可以先获取页面状态：
+Some pages may still be loading. First get page status:
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -152,91 +152,91 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   -d '{"tabId": 123456789, "code": "document.readyState"}'
 ```
 
-期望返回 `"complete"`。
+Expected return: `"complete"`.
 
-#### 3.3 检查脚本语法
+#### 3.3 Check Script Syntax
 
-在浏览器开发者工具控制台中测试脚本是否有语法错误。
+Test the script in browser developer tools console for syntax errors.
 
-### 常见错误原因
+### Common Error Causes
 
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| 元素不存在 | CSS 选择器错误或元素未加载 | 检查选择器，等待元素加载 |
-| 权限被拒绝 | 页面有 CSP 限制 | 部分操作可能受限 |
-| 跨域错误 | 访问 iframe 内容 | 无法直接访问跨域 iframe |
+| Error | Cause | Solution |
+|-------|-------|----------|
+| Element doesn't exist | Wrong CSS selector or element not loaded | Check selector, wait for element to load |
+| Permission denied | Page has CSP restrictions | Some operations may be restricted |
+| Cross-origin error | Accessing iframe content | Cannot directly access cross-origin iframes |
 
-### 解决方案
+### Solutions
 
-1. **tabId 无效**: 重新获取标签页列表
-2. **页面未加载**: 等待几秒后重试
-3. **语法错误**: 修正 JavaScript 代码
-4. **元素不存在**: 使用可选链 `?.` 避免报错
+1. **Invalid tabId**: Re-fetch tab list
+2. **Page not loaded**: Wait a few seconds and retry
+3. **Syntax error**: Fix JavaScript code
+4. **Element doesn't exist**: Use optional chaining `?.` to avoid errors
 
 ```javascript
-// 使用可选链避免元素不存在时报错
+// Use optional chaining to avoid errors when element doesn't exist
 document.querySelector(".not-exist")?.innerText
 ```
 
 ---
 
-## 4. Cookie 获取失败
+## 4. Cookie Retrieval Failed
 
-### 症状
+### Symptoms
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/get_cookies \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789}'
-# 返回空 Cookie 或错误
+# Returns empty cookies or error
 ```
 
-### 诊断步骤
+### Diagnostic Steps
 
-#### 4.1 确认页面有 Cookie
+#### 4.1 Confirm Page has Cookies
 
-在浏览器开发者工具 → Application → Cookies 中确认页面确实有 Cookie。
+In browser developer tools → Application → Cookies, confirm the page actually has cookies.
 
-#### 4.2 检查 tabId
+#### 4.2 Check tabId
 
-确保 tabId 对应的标签页确实是目标网站。
+Ensure the tabId corresponds to the target website.
 
-#### 4.3 检查域名限制
+#### 4.3 Check Domain Restrictions
 
-某些 Cookie 可能设置了特定的域名或路径限制。
+Some cookies may have specific domain or path restrictions.
 
-### 常见问题
+### Common Issues
 
-| 问题 | 原因 | 解决方案 |
-|------|------|----------|
-| Cookie 为空 | 网站未设置 Cookie | 正常情况，无 Cookie 可获取 |
-| HttpOnly Cookie | 脚本无法读取 | 通过扩展 API 可以获取 |
-| SameSite 限制 | Cookie 有 SameSite 策略 | 确保在正确的上下文获取 |
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Empty cookies | Website didn't set cookies | Normal situation, no cookies to retrieve |
+| HttpOnly cookies | Scripts cannot read | Can be retrieved via extension API |
+| SameSite restriction | Cookie has SameSite policy | Ensure retrieval in correct context |
 
-### 解决方案
+### Solutions
 
-1. **确认网站已登录**: 某些 Cookie 只在登录后存在
-2. **等待页面加载**: Cookie 可能在页面加载后才设置
-3. **检查 Cookie 域名**: 确保获取的是正确域名的 Cookie
+1. **Confirm logged in**: Some cookies only exist after login
+2. **Wait for page load**: Cookies may be set after page loads
+3. **Check cookie domain**: Ensure you're getting cookies for the correct domain
 
 ---
 
-## 5. 异步操作超时
+## 5. Async Operation Timeout
 
-### 症状
+### Symptoms
 
-发送请求后，无法获取回调结果：
+After sending request, unable to get callback result:
 
 ```bash
 curl http://localhost:3333/api/browser/callback_response/my-request-id
-# 返回: {"status":"error","message":"未找到给定请求ID的响应"}
+# Returns: {"status":"error","message":"No response found for the given request ID"}
 ```
 
-### 诊断步骤
+### Diagnostic Steps
 
-#### 5.1 理解异步操作机制
+#### 5.1 Understand Async Operation Mechanism
 
-以下操作是异步的，需要等待回调：
+The following operations are asynchronous and require waiting for callback:
 
 - `open_url`
 - `close_tab`
@@ -246,112 +246,112 @@ curl http://localhost:3333/api/browser/callback_response/my-request-id
 - `get_cookies`
 - `upload_file_to_tab`
 
-这些 API 返回 `needsCallback: true` 表示结果需要通过回调获取。
+These APIs return `needsCallback: true` indicating results need to be obtained via callback.
 
-#### 5.2 检查请求 ID
+#### 5.2 Check Request ID
 
-确保使用了正确的 `requestId`。如果没有指定，系统会自动生成，但你需要记录返回的 ID。
+Ensure you're using the correct `requestId`. If not specified, system generates one automatically, but you need to record the returned ID.
 
 ```bash
-# 指定自定义 requestId
+# Specify custom requestId
 curl -X POST http://localhost:3333/api/browser/get_html \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "requestId": "my-custom-id"}'
 
-# 使用相同的 ID 获取结果
+# Use same ID to get result
 curl http://localhost:3333/api/browser/callback_response/my-custom-id
 ```
 
-#### 5.3 使用 SSE 监听
+#### 5.3 Use SSE to Listen
 
-更可靠的方式是使用 SSE 实时接收结果：
+A more reliable way is to use SSE for real-time results:
 
 ```bash
 curl -N http://localhost:3333/api/browser/events
 ```
 
-监听对应的事件（如 `tab_html_received`、`script_executed`）。
+Listen for corresponding events (like `tab_html_received`, `script_executed`).
 
-### 常见原因
+### Common Causes
 
-| 原因 | 说明 | 解决方案 |
-|------|------|----------|
-| 请求 ID 错误 | 使用了不存在的 ID | 确保使用正确的 requestId |
-| 等待时间不足 | 操作还未完成 | 增加等待时间 |
-| 扩展断开 | 浏览器扩展断开连接 | 检查扩展状态，重新连接 |
-| 回调已过期 | 回调结果有存活时间 | 及时获取结果 |
+| Cause | Description | Solution |
+|-------|-------------|----------|
+| Wrong request ID | Using non-existent ID | Ensure using correct requestId |
+| Insufficient wait time | Operation not completed yet | Increase wait time |
+| Extension disconnected | Browser extension disconnected | Check extension status, reconnect |
+| Callback expired | Callback results have TTL | Get results promptly |
 
-### 解决方案
+### Solutions
 
-1. **使用自定义 requestId**: 便于追踪
-2. **增加等待时间**: 复杂操作可能需要更长时间
-3. **使用 SSE**: 实时接收结果，更可靠
-4. **检查扩展连接**: 确保扩展保持连接
+1. **Use custom requestId**: Easier to track
+2. **Increase wait time**: Complex operations may need more time
+3. **Use SSE**: Real-time result reception, more reliable
+4. **Check extension connection**: Ensure extension stays connected
 
 ---
 
-## 快速诊断检查清单
+## Quick Diagnostic Checklist
 
-遇到问题时，按以下顺序检查：
+When encountering issues, check in this order:
 
-### 1. 服务层
+### 1. Service Layer
 
 ```bash
-# 检查服务是否运行
+# Check if service is running
 curl http://localhost:3333/api/browser/status
 ```
 
-- [ ] 服务是否响应？
-- [ ] `isRunning` 是否为 `true`？
+- [ ] Is service responding?
+- [ ] Is `isRunning` `true`?
 
-### 2. 连接层
+### 2. Connection Layer
 
 ```bash
-# 检查扩展连接
+# Check extension connection
 curl http://localhost:3333/api/browser/status | grep activeConnections
 ```
 
-- [ ] `activeConnections` 是否 >= 1？
-- [ ] 浏览器扩展是否已安装并启用？
+- [ ] Is `activeConnections` >= 1?
+- [ ] Is browser extension installed and enabled?
 
-### 3. 数据层
+### 3. Data Layer
 
 ```bash
-# 检查是否能获取标签页
+# Check if tabs can be retrieved
 curl http://localhost:3333/api/browser/tabs
 ```
 
-- [ ] 是否返回标签页列表？
-- [ ] tabId 是否有效？
+- [ ] Does it return tab list?
+- [ ] Is tabId valid?
 
-### 4. 操作层
+### 4. Operation Layer
 
 ```bash
-# 测试简单操作
+# Test simple operation
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": YOUR_TAB_ID, "code": "1+1"}'
 ```
 
-- [ ] 操作是否成功发送？
-- [ ] 是否能获取回调结果？
+- [ ] Is operation sent successfully?
+- [ ] Can callback result be retrieved?
 
 ---
 
-## 获取帮助
+## Getting Help
 
-如果以上方法都无法解决问题：
+If none of the above methods solve the problem:
 
-1. 查看应用日志面板获取详细错误信息
-2. 检查浏览器控制台是否有错误
-3. 尝试重启 Browser Control Manager 应用
-4. 尝试重启浏览器
+1. View application log panel for detailed error information
+2. Check browser console for errors
+3. Try restarting Browser Control Manager application
+4. Try restarting browser
 
 ---
 
-## 更新日志
+## Changelog
 
 ### v1.0.0 (2026-01-10)
-- 初始版本
-- 5 类常见问题的诊断方法
-- 快速诊断检查清单
+- Initial version
+- Diagnostic methods for 5 common problem types
+- Quick diagnostic checklist

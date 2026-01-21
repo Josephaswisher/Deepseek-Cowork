@@ -1,32 +1,32 @@
 #!/usr/bin/env node
 
 /**
- * save_memory.js - 保存对话记忆
+ * save_memory.js - Save Conversation Memory
  * 
- * 用法：
+ * Usage:
  *   node save_memory.js [options]
  * 
- * 选项：
- *   --summary-file <路径>    从文件读取标题和摘要（推荐）
- *   --topic <主题>           指定记忆标题（可选，覆盖文件中的标题）
- *   --keywords <关键词>      指定关键词（逗号分隔）
- *   --summary <摘要>         直接指定摘要文本（需配合 --topic）
- *   --help                  显示帮助信息
+ * Options:
+ *   --summary-file <path>    Read title and summary from file (recommended)
+ *   --topic <topic>          Specify memory title (optional, overrides file title)
+ *   --keywords <keywords>    Specify keywords (comma-separated)
+ *   --summary <summary>      Specify summary text directly (requires --topic)
+ *   --help                   Show help message
  * 
- * 摘要文件格式：
- *   第一行：# 标题
- *   后续行：摘要正文
+ * Summary file format:
+ *   First line: # Title
+ *   Following lines: Summary text
  * 
- * 功能：
- *   1. 读取当前 session 信息
- *   2. 读取标题和摘要（从文件解析或命令行参数）
- *   3. 调用 Memory API 保存对话
- *   4. 输出保存结果
+ * Features:
+ *   1. Read current session info
+ *   2. Read title and summary (from file or command line)
+ *   3. Call Memory API to save conversation
+ *   4. Output save result
  * 
- * 注意：
- *   - 需要 DeepSeek Cowork 应用正在运行
- *   - 需要已连接到 HappyClient session
- *   - 摘要文件第一行必须是标题（# 开头）
+ * Notes:
+ *   - Requires DeepSeek Cowork app to be running
+ *   - Requires connected HappyClient session
+ *   - Summary file first line must be title (starting with #)
  */
 
 const http = require('http');
@@ -35,8 +35,8 @@ const path = require('path');
 const { getApiUrl, readCurrentSession, ensureDataDir } = require('./paths');
 
 /**
- * 解析命令行参数
- * @returns {Object} 解析后的参数
+ * Parse command line arguments
+ * @returns {Object} Parsed arguments
  */
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -68,60 +68,61 @@ function parseArgs() {
 }
 
 /**
- * 显示帮助信息
+ * Show help message
  */
 function showHelp() {
   console.log(`
-保存对话记忆脚本
+Save Conversation Memory Script
 
-用法：
+Usage:
   node save_memory.js [options]
 
-选项：
-  --summary-file <路径>    从文件读取标题和摘要（推荐）
-  --topic <主题>           指定记忆标题（可选，会覆盖文件中的标题）
-  --keywords <关键词>      指定关键词，逗号分隔（可选，自动提取）
-  --summary <摘要>         直接指定摘要文本（需配合 --topic 使用）
-  --help, -h              显示此帮助信息
+Options:
+  --summary-file <path>    Read title and summary from file (recommended)
+  --topic <topic>          Specify memory title (optional, overrides file title)
+  --keywords <keywords>    Specify keywords, comma-separated (optional, auto-extracted)
+  --summary <summary>      Specify summary text directly (requires --topic)
+  --help, -h               Show this help message
 
-摘要文件格式（--summary-file）：
-  第一行必须是标题，格式为 "# 标题内容"
-  标题后面是摘要正文
+Summary file format (--summary-file):
+  First line must be title, format: "# Title Content"
+  Following lines are summary text
 
-  示例文件内容：
+  Example file content:
   ┌────────────────────────────────────
-  │ # 项目重构讨论
+  │ # Project Refactoring Discussion
   │ 
-  │ 本次对话讨论了项目架构重构方案，
-  │ 主要包括以下内容：
-  │ - 数据库层优化
-  │ - API 接口重设计
-  │ - 前端组件拆分
+  │ This conversation discussed project 
+  │ architecture refactoring plan,
+  │ including:
+  │ - Database layer optimization
+  │ - API interface redesign
+  │ - Frontend component splitting
   └────────────────────────────────────
 
-示例：
+Examples:
   node save_memory.js --summary-file ./temp/summary.md
-  node save_memory.js --topic "自定义标题" --summary-file ./temp/summary.md
+  node save_memory.js --topic "Custom Title" --summary-file ./temp/summary.md
 
-推荐流程：
-  1. 分析对话，撰写标题和摘要
-  2. 将内容写入文件（如 .claude/data/conversation-memory/temp/summary.md）
-  3. 使用 --summary-file 参数保存
-  4. 保存成功后可删除临时文件
+Recommended workflow:
+  1. Analyze conversation, write title and summary
+  2. Write content to file (e.g., .claude/data/conversation-memory/temp/summary.md)
+  3. Use --summary-file parameter to save
+  4. Delete temp file after successful save
 
-注意：
-  - 需要 DeepSeek Cowork 应用正在运行
-  - 需要已连接到 HappyClient session
-  - 摘要文件第一行必须是标题（# 开头）
-  - 只会保存上次保存后的新消息
+Notes:
+  - Requires DeepSeek Cowork app to be running
+  - Requires connected HappyClient session
+  - Summary file first line must be title (starting with #)
+  - Only saves new messages since last save
 `);
 }
 
 /**
- * 发送 HTTP POST 请求
- * @param {string} url 请求 URL
- * @param {Object} data 请求数据
- * @returns {Promise<Object>} 响应数据
+ * Send HTTP POST request
+ * @param {string} url Request URL
+ * @param {Object} data Request data
+ * @returns {Promise<Object>} Response data
  */
 function httpPost(url, data) {
   return new Promise((resolve, reject) => {
@@ -156,14 +157,14 @@ function httpPost(url, data) {
             reject(new Error(result.error || `HTTP ${res.statusCode}`));
           }
         } catch (e) {
-          reject(new Error(`解析响应失败: ${body}`));
+          reject(new Error(`Failed to parse response: ${body}`));
         }
       });
     });
     
     req.on('error', (e) => {
       if (e.code === 'ECONNREFUSED') {
-        reject(new Error('无法连接到 DeepSeek Cowork 服务，请确保应用正在运行'));
+        reject(new Error('Cannot connect to DeepSeek Cowork service, please ensure app is running'));
       } else {
         reject(e);
       }
@@ -171,7 +172,7 @@ function httpPost(url, data) {
     
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error('请求超时'));
+      reject(new Error('Request timeout'));
     });
     
     req.write(postData);
@@ -180,113 +181,113 @@ function httpPost(url, data) {
 }
 
 /**
- * 主函数
+ * Main function
  */
 async function main() {
   const options = parseArgs();
   
-  // 显示帮助
+  // Show help
   if (options.help) {
     showHelp();
     process.exit(0);
   }
   
-  console.log('正在保存对话记忆...\n');
+  console.log('Saving conversation memory...\n');
   
-  // 1. 读取当前 session 信息
+  // 1. Read current session info
   const sessionInfo = readCurrentSession();
   
   if (!sessionInfo || !sessionInfo.sessionId) {
-    console.error('错误：无法获取当前 session 信息');
-    console.error('请确保：');
-    console.error('  1. DeepSeek Cowork 应用正在运行');
-    console.error('  2. 已连接到 HappyClient session');
+    console.error('Error: Cannot get current session info');
+    console.error('Please ensure:');
+    console.error('  1. DeepSeek Cowork app is running');
+    console.error('  2. Connected to HappyClient session');
     process.exit(1);
   }
   
-  console.log(`当前 Session: ${sessionInfo.sessionId.substring(0, 8)}...`);
+  console.log(`Current Session: ${sessionInfo.sessionId.substring(0, 8)}...`);
   if (sessionInfo.conversationId) {
-    console.log(`当前对话: ${sessionInfo.conversationId}`);
+    console.log(`Current Conversation: ${sessionInfo.conversationId}`);
   }
   
-  // 2. 确保数据目录存在
+  // 2. Ensure data directory exists
   try {
     ensureDataDir();
   } catch (e) {
-    // 忽略错误，API 会处理
+    // Ignore error, API will handle
   }
   
-  // 3. 处理摘要内容（优先从文件读取）
+  // 3. Process summary content (prefer reading from file)
   let summaryContent = options.summary;
   let topicFromFile = null;
   
   if (options.summaryFile) {
-    // 从文件读取摘要
+    // Read summary from file
     const summaryFilePath = path.isAbsolute(options.summaryFile) 
       ? options.summaryFile 
       : path.resolve(process.cwd(), options.summaryFile);
     
     if (!fs.existsSync(summaryFilePath)) {
-      console.error(`错误：摘要文件不存在: ${summaryFilePath}`);
+      console.error(`Error: Summary file not found: ${summaryFilePath}`);
       process.exit(1);
     }
     
     try {
       const fileContent = fs.readFileSync(summaryFilePath, 'utf8').trim();
       
-      // 解析摘要文件格式：第一行是标题（# 标题），后面是摘要内容
+      // Parse summary file format: first line is title (# Title), rest is summary
       const lines = fileContent.split('\n');
       const firstLine = lines[0].trim();
       
-      // 检查第一行是否是标题格式（# 开头）
+      // Check if first line is title format (starts with #)
       if (firstLine.startsWith('# ')) {
         topicFromFile = firstLine.substring(2).trim();
-        // 摘要内容是标题之后的所有内容
+        // Summary content is everything after title
         summaryContent = lines.slice(1).join('\n').trim();
-        console.log(`已从文件读取摘要: ${summaryFilePath}`);
-        console.log(`标题: ${topicFromFile}`);
-        console.log(`摘要长度: ${summaryContent.length} 字符`);
+        console.log(`Read summary from file: ${summaryFilePath}`);
+        console.log(`Title: ${topicFromFile}`);
+        console.log(`Summary length: ${summaryContent.length} chars`);
       } else {
-        console.error('错误：摘要文件格式不正确');
-        console.error('文件第一行必须是标题，格式为: # 标题内容');
-        console.error('示例：');
-        console.error('  # 项目重构讨论');
+        console.error('Error: Summary file format incorrect');
+        console.error('First line must be title, format: # Title Content');
+        console.error('Example:');
+        console.error('  # Project Refactoring Discussion');
         console.error('  ');
-        console.error('  本次对话讨论了...');
+        console.error('  This conversation discussed...');
         process.exit(1);
       }
     } catch (e) {
-      console.error(`错误：读取摘要文件失败: ${e.message}`);
+      console.error(`Error: Failed to read summary file: ${e.message}`);
       process.exit(1);
     }
   }
   
-  // 检查是否提供了摘要
+  // Check if summary provided
   if (!summaryContent) {
-    console.error('错误：必须提供摘要内容');
-    console.error('请使用以下方式之一：');
-    console.error('  --summary-file <路径>  从文件读取摘要（推荐）');
-    console.error('  --summary <内容>       直接指定摘要文本（需配合 --topic）');
-    console.error('\n摘要文件格式：');
-    console.error('  # 标题');
+    console.error('Error: Summary content required');
+    console.error('Please use one of the following:');
+    console.error('  --summary-file <path>  Read summary from file (recommended)');
+    console.error('  --summary <content>    Specify summary text directly (requires --topic)');
+    console.error('\nSummary file format:');
+    console.error('  # Title');
     console.error('  ');
-    console.error('  摘要正文内容...');
-    console.error('\n使用 --help 查看更多信息');
+    console.error('  Summary text content...');
+    console.error('\nUse --help for more info');
     process.exit(1);
   }
   
-  // 4. 构建请求数据
+  // 4. Build request data
   const requestData = {
     sessionId: sessionInfo.sessionId,
     aiSummary: summaryContent
   };
   
-  // 包含 conversationId（如果有）
+  // Include conversationId (if available)
   if (sessionInfo.conversationId) {
     requestData.conversationId = sessionInfo.conversationId;
   }
   
-  // 标题优先级：命令行参数 > 文件中的标题
+  // Title priority: command line > file title
   if (options.topic) {
     requestData.topic = options.topic;
   } else if (topicFromFile) {
@@ -297,43 +298,43 @@ async function main() {
     requestData.keywords = options.keywords;
   }
   
-  // 5. 调用 API 保存
+  // 5. Call API to save
   try {
     const apiUrl = getApiUrl('/save');
-    console.log(`调用 API: ${apiUrl}`);
+    console.log(`Calling API: ${apiUrl}`);
     
     const result = await httpPost(apiUrl, requestData);
     
     if (result.success) {
-      console.log('\n✓ 记忆保存成功！');
-      console.log(`  记忆名称: ${result.memoryName}`);
-      console.log(`  主题: ${result.topic || '（自动生成）'}`);
-      console.log(`  消息数: ${result.messageCount}`);
+      console.log('\n✓ Memory saved successfully!');
+      console.log(`  Memory name: ${result.memoryName}`);
+      console.log(`  Topic: ${result.topic || '(auto-generated)'}`);
+      console.log(`  Message count: ${result.messageCount}`);
       if (result.conversationId) {
-        console.log(`  对话ID: ${result.conversationId}`);
+        console.log(`  Conversation ID: ${result.conversationId}`);
       }
       
-      // 提示查看位置
-      console.log('\n记忆文件已保存到:');
+      // Show save location
+      console.log('\nMemory files saved to:');
       console.log(`  .claude/data/conversation-memory/memories/active/${result.memoryName}/`);
     } else {
-      console.error('\n✗ 保存失败:', result.error);
+      console.error('\n✗ Save failed:', result.error);
       process.exit(1);
     }
     
   } catch (error) {
-    console.error('\n✗ 保存失败:', error.message);
+    console.error('\n✗ Save failed:', error.message);
     
-    if (error.message.includes('无法连接')) {
-      console.error('\n提示：请确保 DeepSeek Cowork 应用正在运行');
+    if (error.message.includes('Cannot connect')) {
+      console.error('\nTip: Please ensure DeepSeek Cowork app is running');
     }
     
     process.exit(1);
   }
 }
 
-// 运行
+// Run
 main().catch(err => {
-  console.error('未知错误:', err);
+  console.error('Unknown error:', err);
   process.exit(1);
 });

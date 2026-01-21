@@ -1,33 +1,33 @@
 #!/usr/bin/env node
 
 /**
- * Browser Control Script Execution Helper Tool
+ * Browser Control 脚本执行辅助工具
  * 
- * Usage:
- *   Method 1: Pass complete request JSON file
+ * 用法：
+ *   方式 1：传入完整的请求 JSON 文件
  *   node run_script.js request.json
  * 
- *   Method 2: Pass tabId and script file
+ *   方式 2：传入 tabId 和脚本文件
  *   node run_script.js --tabId 123456789 script.js
  * 
- *   Method 3: Execute script from library
+ *   方式 3：从库中读取脚本执行
  *   node run_script.js --from-library xiaohongshu.com/get_note_info.js --tabId 123456789
  * 
- *   Method 4: Execute and auto-archive
+ *   方式 4：执行并自动归档
  *   node run_script.js --tabId 123456789 script.js --auto-archive \
- *     --url "https://..." --name "my_script" --purpose "description" --keywords "keywords"
+ *     --url "https://..." --name "my_script" --purpose "描述" --keywords "关键词"
  * 
- *   Method 5: Execute script with visual feedback
+ *   方式 5：执行脚本并启用视觉反馈
  *   node run_script.js --tabId 123456789 script.js --visual-feedback
  * 
- * Features:
- *   - Read file content (correct UTF-8 encoding handling)
- *   - Read reusable scripts from script library
- *   - Construct HTTP request
- *   - Send request and auto-poll for results
- *   - Auto-archive to script library after successful execution
- *   - Support visual feedback (highlight operated elements)
- *   - Output execution results
+ * 功能：
+ *   - 读取文件内容（正确处理 UTF-8 编码）
+ *   - 从脚本库读取可复用脚本
+ *   - 构造 HTTP 请求
+ *   - 发送请求并自动轮询获取结果
+ *   - 执行成功后自动归档到脚本库
+ *   - 支持视觉反馈（高亮显示操作的元素）
+ *   - 输出执行结果
  * 
  * @created 2026-01-11
  * @updated 2026-01-12
@@ -37,7 +37,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// Lazy load path module (avoid errors when not installed)
+// 延迟加载路径模块（避免在未安装时报错）
 let pathsModule = null;
 let archiveModule = null;
 let updateIndexModule = null;
@@ -50,14 +50,14 @@ function loadModules() {
       archiveModule = require('./archive_script');
       updateIndexModule = require('./update_index');
     } catch (e) {
-      // Ignore when modules unavailable
+      // 模块不可用时忽略
     }
   }
 }
 
 /**
- * Get visual feedback module code
- * @returns {string|null} Visual feedback module code
+ * 获取视觉反馈模块代码
+ * @returns {string|null} 视觉反馈模块代码
  */
 function getVisualFeedbackCode() {
   if (visualFeedbackModule === null) {
@@ -76,28 +76,28 @@ function getVisualFeedbackCode() {
 }
 
 /**
- * Inject visual feedback module into script
- * @param {string} code - Original script code
- * @returns {string} Code with injection
+ * 将视觉反馈模块注入到脚本中
+ * @param {string} code - 原始脚本代码
+ * @returns {string} 注入后的代码
  */
 function injectVisualFeedback(code) {
   const vfCode = getVisualFeedbackCode();
   if (!vfCode) {
-    console.warn('Warning: Visual feedback module unavailable, will not inject visual feedback');
+    console.warn('警告：视觉反馈模块不可用，将不注入视觉反馈功能');
     return code;
   }
   
-  // Put visual feedback module code before user script
-  // User script can directly use __bcHighlight API
+  // 将视觉反馈模块代码放在用户脚本前面
+  // 用户脚本可以直接使用 __bcHighlight API
   return `${vfCode}\n\n${code}`;
 }
 
 const BASE_URL = 'http://localhost:3333';
-const POLL_INTERVAL = 500;  // Poll interval (ms)
-const MAX_POLL_ATTEMPTS = 20;  // Max poll attempts
+const POLL_INTERVAL = 500;  // 轮询间隔 (ms)
+const MAX_POLL_ATTEMPTS = 20;  // 最大轮询次数
 
 /**
- * Send HTTP request
+ * 发送 HTTP 请求
  */
 function request(url, options = {}) {
   return new Promise((resolve, reject) => {
@@ -125,7 +125,7 @@ function request(url, options = {}) {
     req.on('error', reject);
     req.setTimeout(10000, () => {
       req.destroy();
-      reject(new Error('Request timeout'));
+      reject(new Error('请求超时'));
     });
 
     if (options.body) {
@@ -136,7 +136,7 @@ function request(url, options = {}) {
 }
 
 /**
- * Poll for callback result
+ * 轮询获取回调结果
  */
 async function pollResult(requestId) {
   for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
@@ -148,22 +148,22 @@ async function pollResult(requestId) {
         return res.data;
       }
     } catch (e) {
-      // Continue polling
+      // 继续轮询
     }
   }
-  return { status: 'error', message: 'Poll timeout, result not obtained' };
+  return { status: 'error', message: '轮询超时，未获取到结果' };
 }
 
 /**
- * Read script from library
- * @param {string} libraryPath - Library path, e.g., xiaohongshu.com/get_note_info.js
- * @returns {string|null} Script code
+ * 从脚本库读取脚本
+ * @param {string} libraryPath - 库路径，如 xiaohongshu.com/get_note_info.js
+ * @returns {string|null} 脚本代码
  */
 function readFromLibrary(libraryPath) {
   loadModules();
   
   if (!pathsModule) {
-    console.error('Error: Path module unavailable');
+    console.error('错误：路径模块不可用');
     return null;
   }
   
@@ -171,25 +171,25 @@ function readFromLibrary(libraryPath) {
   const fullPath = path.join(libraryDir, libraryPath);
   
   if (!fs.existsSync(fullPath)) {
-    console.error(`Error: Library script not found - ${fullPath}`);
+    console.error(`错误：库脚本不存在 - ${fullPath}`);
     return null;
   }
   
   const content = fs.readFileSync(fullPath, 'utf-8');
   
-  // Extract actual code part (skip meta comment)
+  // 提取实际代码部分（跳过元信息注释）
   const codeStart = content.indexOf('(() =>');
   if (codeStart !== -1) {
     return content.substring(codeStart).trim();
   }
   
-  // Try another format
+  // 尝试另一种格式
   const funcStart = content.indexOf('(function');
   if (funcStart !== -1) {
     return content.substring(funcStart).trim();
   }
   
-  // Standard format not found, return full content (remove comment header)
+  // 没有找到标准格式，返回全部内容（移除注释头）
   const lines = content.split('\n');
   let startLine = 0;
   for (let i = 0; i < lines.length; i++) {
@@ -203,8 +203,8 @@ function readFromLibrary(libraryPath) {
 }
 
 /**
- * Update script usage count
- * @param {string} libraryPath - Library path
+ * 更新脚本使用次数
+ * @param {string} libraryPath - 库路径
  */
 function incrementUsageCount(libraryPath) {
   loadModules();
@@ -218,7 +218,7 @@ function incrementUsageCount(libraryPath) {
   
   let content = fs.readFileSync(fullPath, 'utf-8');
   
-  // Update usageCount
+  // 更新 usageCount
   const match = content.match(/@usageCount\s+(\d+)/);
   if (match) {
     const currentCount = parseInt(match[1], 10);
@@ -228,15 +228,15 @@ function incrementUsageCount(libraryPath) {
 }
 
 /**
- * Execute script request
+ * 执行脚本请求
  */
 async function executeScript(requestBody, options = {}) {
-  // Generate requestId (if not provided)
+  // 生成 requestId（如果没有提供）
   if (!requestBody.requestId) {
     requestBody.requestId = `script-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  console.log('Sending request...');
+  console.log('发送请求...');
   console.log(`  tabId: ${requestBody.tabId}`);
   console.log(`  requestId: ${requestBody.requestId}`);
   console.log(`  code: ${requestBody.code.substring(0, 100)}${requestBody.code.length > 100 ? '...' : ''}`);
@@ -249,63 +249,63 @@ async function executeScript(requestBody, options = {}) {
     });
 
     if (res.status !== 200 || res.data?.status !== 'success') {
-      console.error('Request failed:', res.data);
+      console.error('请求失败:', res.data);
       return { success: false, error: res.data };
     }
 
-    console.log('Request sent, waiting for result...');
+    console.log('请求已发送，等待结果...');
 
-    // Poll for result
+    // 轮询获取结果
     const result = await pollResult(requestBody.requestId);
     
-    console.log('\nExecution result:');
+    console.log('\n执行结果:');
     console.log(JSON.stringify(result, null, 2));
     
-    // Determine if execution succeeded
+    // 判断执行是否成功
     const isSuccess = result.status === 'success' && 
       (result.result?.success === true || result.result?.success === undefined);
     
-    // If auto-archive enabled and execution succeeded
+    // 如果开启自动归档且执行成功
     if (options.autoArchive && isSuccess) {
       await handleAutoArchive(requestBody.code, options);
     }
     
-    // If script from library, update usage count
+    // 如果是从库中读取的脚本，更新使用次数
     if (options.fromLibrary && isSuccess) {
       incrementUsageCount(options.fromLibrary);
     }
     
     return { success: isSuccess, result };
   } catch (err) {
-    console.error('Execution failed:', err.message);
+    console.error('执行失败:', err.message);
     return { success: false, error: err.message };
   }
 }
 
 /**
- * Handle auto-archive
+ * 处理自动归档
  */
 async function handleAutoArchive(code, options) {
   loadModules();
   
   if (!archiveModule) {
-    console.log('\nNote: Archive module unavailable, skipping auto-archive');
+    console.log('\n提示：归档模块不可用，跳过自动归档');
     return;
   }
   
   const { url, name, purpose, keywords } = options;
   
   if (!name) {
-    console.log('\nNote: Script name (--name) not provided, skipping auto-archive');
+    console.log('\n提示：未提供脚本名称 (--name)，跳过自动归档');
     return;
   }
   
   if (!url && !options.common) {
-    console.log('\nNote: URL (--url) or --common not provided, skipping auto-archive');
+    console.log('\n提示：未提供 URL (--url) 或 --common，跳过自动归档');
     return;
   }
   
-  console.log('\nArchiving script...');
+  console.log('\n正在归档脚本...');
   
   const archiveResult = archiveModule.archiveScript({
     code,
@@ -318,20 +318,20 @@ async function handleAutoArchive(code, options) {
   
   if (archiveResult.success) {
     console.log(`✓ ${archiveResult.message}`);
-    console.log(`  Path: ${archiveResult.path}`);
+    console.log(`  路径: ${archiveResult.path}`);
     
-    // Update index
+    // 更新索引
     if (updateIndexModule) {
       updateIndexModule.updateIndex();
-      console.log('✓ Index updated');
+      console.log('✓ 索引已更新');
     }
   } else {
-    console.log(`⚠ Archive failed: ${archiveResult.error}`);
+    console.log(`⚠ 归档失败: ${archiveResult.error}`);
   }
 }
 
 /**
- * Parse command line arguments
+ * 解析命令行参数
  */
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -341,7 +341,7 @@ function parseArgs() {
     process.exit(1);
   }
 
-  // Check for --help
+  // 检查是否是 --help
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
     process.exit(0);
@@ -362,7 +362,7 @@ function parseArgs() {
     common: false
   };
   
-  // Parse arguments
+  // 解析参数
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case '--tabId':
@@ -395,7 +395,7 @@ function parseArgs() {
         config.common = true;
         break;
       default:
-        // Non-option argument
+        // 非选项参数
         if (!args[i].startsWith('--')) {
           if (args[i].endsWith('.json')) {
             config.jsonFile = args[i];
@@ -408,24 +408,24 @@ function parseArgs() {
     }
   }
   
-  // Validate arguments
+  // 验证参数
   if (config.mode === 'library' && !config.tabId) {
-    console.error('Error: --from-library requires --tabId');
+    console.error('错误：--from-library 需要同时提供 --tabId');
     process.exit(1);
   }
   
   if (config.mode === 'script' && !config.tabId) {
-    console.error('Error: Script mode requires --tabId');
+    console.error('错误：脚本模式需要同时提供 --tabId');
     process.exit(1);
   }
   
   if (!config.mode && config.tabId) {
-    console.error('Error: Need to provide script file or --from-library parameter');
+    console.error('错误：需要提供脚本文件或 --from-library 参数');
     process.exit(1);
   }
   
   if (!config.mode) {
-    console.error('Error: Need to provide request file, script file, or --from-library parameter');
+    console.error('错误：需要提供请求文件、脚本文件或 --from-library 参数');
     printUsage();
     process.exit(1);
   }
@@ -434,85 +434,85 @@ function parseArgs() {
 }
 
 /**
- * Print usage instructions
+ * 打印使用说明
  */
 function printUsage() {
   console.log(`
-Browser Control Script Execution Helper Tool
+Browser Control 脚本执行辅助工具
 
-Usage:
-  Method 1: Pass complete request JSON file
+用法:
+  方式 1：传入完整的请求 JSON 文件
   node run_script.js <request.json>
 
-  Method 2: Pass tabId and script file
+  方式 2：传入 tabId 和脚本文件
   node run_script.js --tabId <tabId> <script.js>
 
-  Method 3: Execute from script library
+  方式 3：从脚本库读取执行
   node run_script.js --from-library <domain/script.js> --tabId <tabId>
 
-  Method 4: Execute and auto-archive (new script)
+  方式 4：执行并自动归档（新脚本）
   node run_script.js --tabId <tabId> <script.js> --auto-archive \\
     --url <url> --name <name> --purpose <desc> --keywords <kw1,kw2>
 
-  Method 5: Execute script with visual feedback
+  方式 5：启用视觉反馈执行脚本
   node run_script.js --tabId <tabId> <script.js> --visual-feedback
 
-Examples:
-  # Execute from JSON file
+示例:
+  # 从 JSON 文件执行
   node run_script.js script_request.json
 
-  # Execute from script file
+  # 从脚本文件执行
   node run_script.js --tabId 123456789 get_title.js
 
-  # Execute from library
+  # 从库中读取执行
   node run_script.js --from-library xiaohongshu.com/get_note_info.js --tabId 123456789
 
-  # Execute and archive to specific site
+  # 执行并归档到特定站点
   node run_script.js --tabId 123456789 my_script.js --auto-archive \\
     --url "https://www.xiaohongshu.com/..." \\
     --name "get_note_info" \\
-    --purpose "Extract note info" \\
-    --keywords "note,title,likes"
+    --purpose "提取笔记信息" \\
+    --keywords "笔记,标题,点赞"
 
-  # Execute and archive to common directory
+  # 执行并归档到通用目录
   node run_script.js --tabId 123456789 scroll.js --auto-archive \\
-    --common --name "scroll_to_bottom" --purpose "Scroll to bottom"
+    --common --name "scroll_to_bottom" --purpose "滚动到底部"
 
-  # Execute with visual feedback (highlight operated elements)
+  # 启用视觉反馈执行脚本（高亮显示操作的元素）
   node run_script.js --tabId 123456789 click_button.js --visual-feedback
 
-JSON request file format:
+JSON 请求文件格式:
   {
     "tabId": 123456789,
     "code": "document.title"
   }
 
-Options:
-  --tabId <id>              Specify target tab ID
-  --from-library <path>     Read from script library (e.g., xiaohongshu.com/get_note_info.js)
-  --auto-archive            Auto-archive after successful execution
-  --visual-feedback, --vf   Enable visual feedback (highlight operated elements)
-  --url <url>               Target page URL (for archive domain)
-  --name <name>             Script name (for archive)
-  --purpose <desc>          Script purpose description (for archive)
-  --keywords <kw1,kw2>      Keywords, comma-separated (for archive)
-  --common                  Archive to common scripts directory
-  --help, -h                Show this help message
+选项:
+  --tabId <id>              指定目标标签页 ID
+  --from-library <path>     从脚本库读取（如 xiaohongshu.com/get_note_info.js）
+  --auto-archive            执行成功后自动归档
+  --visual-feedback, --vf   启用视觉反馈（高亮显示操作的元素）
+  --url <url>               目标页面 URL（用于确定归档域名）
+  --name <name>             脚本名称（用于归档）
+  --purpose <desc>          脚本用途描述（用于归档）
+  --keywords <kw1,kw2>      关键词，逗号分隔（用于归档）
+  --common                  归档到通用脚本目录
+  --help, -h                显示此帮助信息
 
-Visual feedback notes:
-  With --visual-feedback enabled, scripts can use __bcHighlight API:
-  - __bcHighlight.show(element, options)    Show highlight
-  - __bcHighlight.hide(element)             Hide highlight
-  - __bcHighlight.success(element)          Success feedback (green)
-  - __bcHighlight.fail(element)             Failure feedback (red)
-  - __bcHighlight.withFeedback(el, fn)      Auto-wrap operation
-  - __bcHighlight.batch(elements, fn)       Batch operation with numbers
-  - __bcHighlight.cleanup()                 Clear all highlights
+视觉反馈说明:
+  启用 --visual-feedback 后，脚本中可以使用 __bcHighlight API：
+  - __bcHighlight.show(element, options)    显示高亮
+  - __bcHighlight.hide(element)             隐藏高亮
+  - __bcHighlight.success(element)          成功反馈（绿色）
+  - __bcHighlight.fail(element)             失败反馈（红色）
+  - __bcHighlight.withFeedback(el, fn)      自动包装操作
+  - __bcHighlight.batch(elements, fn)       批量操作带序号
+  - __bcHighlight.cleanup()                 清理所有高亮
 `);
 }
 
 /**
- * Main function
+ * 主函数
  */
 async function main() {
   const config = parseArgs();
@@ -520,11 +520,11 @@ async function main() {
   let code;
 
   if (config.mode === 'json') {
-    // Method 1: Read JSON request file
+    // 方式 1：读取 JSON 请求文件
     const filePath = path.resolve(config.jsonFile);
     
     if (!fs.existsSync(filePath)) {
-      console.error(`Error: File not found - ${filePath}`);
+      console.error(`错误：文件不存在 - ${filePath}`);
       process.exit(1);
     }
 
@@ -532,19 +532,19 @@ async function main() {
       const content = fs.readFileSync(filePath, 'utf-8');
       requestBody = JSON.parse(content);
     } catch (e) {
-      console.error(`Error: Failed to parse JSON file - ${e.message}`);
+      console.error(`错误：无法解析 JSON 文件 - ${e.message}`);
       process.exit(1);
     }
 
     if (!requestBody.tabId || !requestBody.code) {
-      console.error('Error: JSON file must contain tabId and code fields');
+      console.error('错误：JSON 文件必须包含 tabId 和 code 字段');
       process.exit(1);
     }
     
     code = requestBody.code;
     
   } else if (config.mode === 'library') {
-    // Method 3: Read from script library
+    // 方式 3：从脚本库读取
     code = readFromLibrary(config.fromLibrary);
     
     if (!code) {
@@ -556,14 +556,14 @@ async function main() {
       code: code
     };
     
-    console.log(`Reading script from library: ${config.fromLibrary}`);
+    console.log(`从库中读取脚本: ${config.fromLibrary}`);
     
   } else {
-    // Method 2: Read script file and construct request
+    // 方式 2：读取脚本文件并构造请求
     const filePath = path.resolve(config.scriptFile);
     
     if (!fs.existsSync(filePath)) {
-      console.error(`Error: Script file not found - ${filePath}`);
+      console.error(`错误：脚本文件不存在 - ${filePath}`);
       process.exit(1);
     }
 
@@ -574,14 +574,14 @@ async function main() {
         code: code
       };
     } catch (e) {
-      console.error(`Error: Failed to read script file - ${e.message}`);
+      console.error(`错误：无法读取脚本文件 - ${e.message}`);
       process.exit(1);
     }
   }
 
-  // If visual feedback enabled, inject visual feedback module
+  // 如果启用视觉反馈，注入视觉反馈模块
   if (config.visualFeedback) {
-    console.log('Enabling visual feedback mode...');
+    console.log('启用视觉反馈模式...');
     requestBody.code = injectVisualFeedback(requestBody.code);
   }
 

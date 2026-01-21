@@ -1,74 +1,74 @@
 ---
 name: browser-control
-description: 此技能应在用户需要通过 HTTP API 控制浏览器时使用，支持标签页管理、页面内容获取、脚本执行、Cookie 操作等功能。
+description: This skill should be used when the user needs to control the browser via HTTP API, supporting tab management, page content retrieval, script execution, Cookie operations, and more.
 version: 1.2.0
 ---
 
-# Browser Control 技能
+# Browser Control Skill
 
-通过 HTTP API 控制浏览器，实现标签页管理、页面内容获取、脚本执行、Cookie 操作等自动化功能。
+Control the browser via HTTP API to automate tab management, page content retrieval, script execution, Cookie operations, and more.
 
-## 前置检查
+## Prerequisites
 
-在执行任何浏览器操作前，先检查服务状态：
+Before executing any browser operation, check the service status:
 
 ```bash
 curl http://localhost:3333/api/browser/status
 ```
 
-确认：
-- `isRunning: true` - 服务运行中
-- `activeConnections >= 1` - 浏览器扩展已连接
+Verify:
+- `isRunning: true` - Service is running
+- `activeConnections >= 1` - Browser extension is connected
 
-如果服务未运行或扩展未连接，浏览器操作将失败。
+If the service is not running or the extension is not connected, browser operations will fail.
 
-## 强制规范
+## Mandatory Guidelines
 
-**临时文件存放位置**：所有临时脚本和 JSON 请求文件必须创建在：
+**Temporary file location**: All temporary scripts and JSON request files must be created in:
 
 ```
 .claude/data/browser-control/workspace/
 ```
 
-**禁止**在项目根目录创建临时文件。
+**Do not** create temporary files in the project root directory.
 
-## 决策指南
+## Decision Guide
 
 ```mermaid
 flowchart TD
-    Start[需要执行浏览器脚本] --> Search[先搜索脚本库]
-    Search --> Found{找到现成脚本?}
-    Found -->|是| UseLib["--from-library 执行"]
-    Found -->|否| Create[在 workspace 创建新脚本]
-    Create --> Archive["带 --auto-archive 执行"]
-    UseLib --> Done[完成]
+    Start[Need to execute browser script] --> Search[Search script library first]
+    Search --> Found{Found existing script?}
+    Found -->|Yes| UseLib["Execute with --from-library"]
+    Found -->|No| Create[Create new script in workspace]
+    Create --> Archive["Execute with --auto-archive"]
+    UseLib --> Done[Done]
     Archive --> Done
 ```
 
-## 推荐工作流
+## Recommended Workflow
 
-执行脚本注入前，遵循以下流程：
+Before executing script injection, follow this process:
 
-> **重要**：执行脚本时，**始终添加 `--visual-feedback` 参数**，让用户能看到脚本正在操作哪些页面元素。
+> **Important**: When executing scripts, **always add the `--visual-feedback` parameter** so users can see which page elements the script is operating on.
 
-### 步骤 1：先搜索库
+### Step 1: Search the Library First
 
 ```bash
-# 按 URL 搜索
+# Search by URL
 node .claude/skills/browser-control/scripts/search_library.js \
   --url "https://www.xiaohongshu.com/explore/xxx"
 
-# 按域名 + 关键词搜索
+# Search by domain + keywords
 node .claude/skills/browser-control/scripts/search_library.js \
-  --domain xiaohongshu.com --keywords "笔记,提取"
+  --domain xiaohongshu.com --keywords "note,extract"
 
-# 查看所有可用脚本
+# List all available scripts
 node .claude/skills/browser-control/scripts/search_library.js --list
 ```
 
-### 步骤 2a：复用现有脚本
+### Step 2a: Reuse Existing Script
 
-如果找到匹配脚本，直接从库中读取执行：
+If a matching script is found, execute it directly from the library:
 
 ```bash
 node .claude/skills/browser-control/scripts/run_script.js \
@@ -77,110 +77,110 @@ node .claude/skills/browser-control/scripts/run_script.js \
   --visual-feedback
 ```
 
-### 步骤 2b：创建新脚本并自动归档
+### Step 2b: Create New Script and Auto-Archive
 
-如果没有现成脚本，创建新脚本并开启自动归档：
+If no existing script is found, create a new one with auto-archiving enabled:
 
 ```bash
-# 在 workspace 目录创建 JS 脚本文件
-# 路径：.claude/data/browser-control/workspace/my_script.js
-# 然后执行并自动归档
+# Create JS script file in workspace directory
+# Path: .claude/data/browser-control/workspace/my_script.js
+# Then execute with auto-archive
 node .claude/skills/browser-control/scripts/run_script.js \
   --tabId 123456789 .claude/data/browser-control/workspace/my_script.js \
   --visual-feedback \
   --auto-archive \
   --url "https://www.xiaohongshu.com/..." \
   --name "get_note_info" \
-  --purpose "提取笔记信息" \
-  --keywords "笔记,标题,点赞"
+  --purpose "Extract note information" \
+  --keywords "note,title,likes"
 ```
 
-执行成功后，脚本会自动保存到 `.claude/data/browser-control/library/xiaohongshu.com/get_note_info.js`。
+After successful execution, the script will be automatically saved to `.claude/data/browser-control/library/xiaohongshu.com/get_note_info.js`.
 
-## 核心能力
+## Core Capabilities
 
-### 1. 标签页管理
+### 1. Tab Management
 
-| 操作 | API |
-|------|-----|
-| 获取标签页列表 | `GET /api/browser/tabs` |
-| 打开新 URL | `POST /api/browser/open_url` |
-| 关闭标签页 | `POST /api/browser/close_tab` |
+| Operation | API |
+|-----------|-----|
+| Get tab list | `GET /api/browser/tabs` |
+| Open new URL | `POST /api/browser/open_url` |
+| Close tab | `POST /api/browser/close_tab` |
 
-详细参数和示例请查阅 [references/API.md](references/API.md) 的「标签页操作」章节。
+For detailed parameters and examples, see the "Tab Operations" section in [references/API.md](references/API.md).
 
-### 2. 页面内容获取
+### 2. Page Content Retrieval
 
-| 操作 | API |
-|------|-----|
-| 获取页面 HTML | `POST /api/browser/get_html` |
+| Operation | API |
+|-----------|-----|
+| Get page HTML | `POST /api/browser/get_html` |
 
-获取页面 HTML 是异步操作，需要使用 `requestId` 获取结果。
+Getting page HTML is an asynchronous operation that requires using `requestId` to retrieve results.
 
-详细用法请查阅 [references/SCENARIOS.md](references/SCENARIOS.md) 的「场景 1: 获取网页内容进行分析」。
+For detailed usage, see "Scenario 1: Get Web Content for Analysis" in [references/SCENARIOS.md](references/SCENARIOS.md).
 
-### 3. 脚本执行
+### 3. Script Execution
 
-| 操作 | API |
-|------|-----|
-| 执行 JavaScript | `POST /api/browser/execute_script` |
-| 注入 CSS | `POST /api/browser/inject_css` |
+| Operation | API |
+|-----------|-----|
+| Execute JavaScript | `POST /api/browser/execute_script` |
+| Inject CSS | `POST /api/browser/inject_css` |
 
-可用于：
-- 获取页面标题、文本、链接等信息
-- 点击按钮、填写表单
-- 滚动页面
-- 提取特定数据
+Can be used for:
+- Getting page title, text, links, and other information
+- Clicking buttons, filling forms
+- Scrolling pages
+- Extracting specific data
 
-**重要**：编写注入脚本前，必须先阅读 [references/SCRIPT-WRITING-GUIDE.md](references/SCRIPT-WRITING-GUIDE.md)，了解：
-- 中文及特殊字符的编码处理（避免乱码）
-- 返回值的序列化要求（避免返回空对象）
-- 错误处理最佳实践
-- 常用脚本模板
+**Important**: Before writing injection scripts, read [references/SCRIPT-WRITING-GUIDE.md](references/SCRIPT-WRITING-GUIDE.md) to understand:
+- Encoding handling for Chinese and special characters (avoiding garbled text)
+- Serialization requirements for return values (avoiding empty objects)
+- Error handling best practices
+- Common script templates
 
-详细用法请查阅 [references/SCENARIOS.md](references/SCENARIOS.md) 的「场景 5: 在页面执行自动化操作」。
+For detailed usage, see "Scenario 5: Execute Automation on Pages" in [references/SCENARIOS.md](references/SCENARIOS.md).
 
-### 4. Cookie 操作
+### 4. Cookie Operations
 
-| 操作 | API |
-|------|-----|
-| 从浏览器获取 Cookie | `POST /api/browser/get_cookies` |
-| 保存 Cookie 到数据库 | `POST /api/browser/save_cookies` |
-| 查询已保存的 Cookie | `GET /api/browser/cookies` |
+| Operation | API |
+|-----------|-----|
+| Get cookies from browser | `POST /api/browser/get_cookies` |
+| Save cookies to database | `POST /api/browser/save_cookies` |
+| Query saved cookies | `GET /api/browser/cookies` |
 
-详细用法请查阅 [references/SCENARIOS.md](references/SCENARIOS.md) 的「场景 4: 获取登录态 Cookie」。
+For detailed usage, see "Scenario 4: Get Login Session Cookies" in [references/SCENARIOS.md](references/SCENARIOS.md).
 
-### 5. 事件监听
+### 5. Event Listening
 
-| 操作 | API |
-|------|-----|
-| SSE 事件流 | `GET /api/browser/events` |
-| 发送自定义事件 | `POST /api/browser/emit_event` |
+| Operation | API |
+|-----------|-----|
+| SSE event stream | `GET /api/browser/events` |
+| Send custom event | `POST /api/browser/emit_event` |
 
-通过 SSE 实时接收浏览器事件，如标签页变化、脚本执行结果等。
+Receive browser events in real-time via SSE, such as tab changes, script execution results, etc.
 
-详细用法请查阅 [references/SCENARIOS.md](references/SCENARIOS.md) 的「场景 6: 监听页面变化」。
+For detailed usage, see "Scenario 6: Monitor Page Changes" in [references/SCENARIOS.md](references/SCENARIOS.md).
 
-## 参考文档
+## Reference Documentation
 
-| 文档 | 说明 |
-|------|------|
-| [references/API.md](references/API.md) | 完整 API 参考 |
-| [references/QUICKSTART.md](references/QUICKSTART.md) | 快速开始，常用操作模板 |
-| [references/SCENARIOS.md](references/SCENARIOS.md) | 使用场景指南 |
-| [references/SCRIPT-WRITING-GUIDE.md](references/SCRIPT-WRITING-GUIDE.md) | 注入脚本编写指南 |
-| [references/TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) | 故障排查 |
+| Document | Description |
+|----------|-------------|
+| [references/API.md](references/API.md) | Complete API reference |
+| [references/QUICKSTART.md](references/QUICKSTART.md) | Quick start with common operation templates |
+| [references/SCENARIOS.md](references/SCENARIOS.md) | Usage scenarios guide |
+| [references/SCRIPT-WRITING-GUIDE.md](references/SCRIPT-WRITING-GUIDE.md) | Injection script writing guide |
+| [references/TROUBLESHOOTING.md](references/TROUBLESHOOTING.md) | Troubleshooting guide |
 
-## 辅助脚本速查
+## Helper Scripts Quick Reference
 
-| 脚本 | 用途 | 关键参数 |
-|------|------|----------|
-| `check_status.js` | 检查服务状态 | 无参数 |
-| `search_library.js` | 搜索脚本库 | `--url`, `--domain`, `--keywords`, `--list` |
-| `run_script.js` | 执行脚本 | `--tabId`, `--from-library`, `--auto-archive`, `--visual-feedback` |
-| `archive_script.js` | 归档脚本 | `--file`, `--url`, `--name`, `--purpose`, `--keywords` |
-| `update_index.js` | 更新索引 | 无参数 |
+| Script | Purpose | Key Parameters |
+|--------|---------|----------------|
+| `check_status.js` | Check service status | No parameters |
+| `search_library.js` | Search script library | `--url`, `--domain`, `--keywords`, `--list` |
+| `run_script.js` | Execute script | `--tabId`, `--from-library`, `--auto-archive`, `--visual-feedback` |
+| `archive_script.js` | Archive script | `--file`, `--url`, `--name`, `--purpose`, `--keywords` |
+| `update_index.js` | Update index | No parameters |
 
-**视觉反馈**：执行脚本时始终添加 `--visual-feedback` 参数，详见 [references/SCRIPT-WRITING-GUIDE.md](references/SCRIPT-WRITING-GUIDE.md) 的「8. 视觉反馈」章节。
+**Visual Feedback**: Always add the `--visual-feedback` parameter when executing scripts. See the "8. Visual Feedback" section in [references/SCRIPT-WRITING-GUIDE.md](references/SCRIPT-WRITING-GUIDE.md).
 
-**脚本模板**：`scripts/templates/` 目录下提供 `extract_with_feedback.js`、`form_with_feedback.js`、`click_with_feedback.js` 等模板。
+**Script Templates**: The `scripts/templates/` directory provides templates like `extract_with_feedback.js`, `form_with_feedback.js`, and `click_with_feedback.js`.

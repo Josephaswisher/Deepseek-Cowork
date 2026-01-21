@@ -1,5 +1,5 @@
 ---
-title: Browser Control Usage Scenarios Guide
+title: Browser Control 使用场景指南
 version: 1.0.0
 created: 2026-01-10
 updated: 2026-01-10
@@ -7,27 +7,27 @@ author: agent-kaichi
 status: stable
 ---
 
-# Browser Control Usage Scenarios Guide
+# Browser Control 使用场景指南
 
-This document is organized by practical tasks, providing complete operation workflows for common usage scenarios.
+本文档按实际任务组织，提供常见使用场景的完整操作流程。
 
 ---
 
-## Scenario 1: Get Web Content for Analysis
+## 场景 1: 获取网页内容进行分析
 
-**Goal**: Get complete content of a webpage for subsequent analysis
+**目标**: 获取某个网页的完整内容供后续分析
 
-### Steps
+### 步骤
 
-#### 1.1 Get Tab List
+#### 1.1 获取标签页列表
 
-First find the tabId of the target page:
+首先找到目标页面的 tabId：
 
 ```bash
 curl http://localhost:3333/api/browser/tabs
 ```
 
-Find the target page from the response:
+从返回结果中找到目标页面：
 
 ```json
 {
@@ -35,15 +35,15 @@ Find the target page from the response:
     {
       "id": 123456789,
       "url": "https://example.com/article",
-      "title": "Article Title"
+      "title": "文章标题"
     }
   ]
 }
 ```
 
-Record the `id` value (e.g., `123456789`).
+记录 `id` 值（如 `123456789`）。
 
-#### 1.2 Get Page HTML
+#### 1.2 获取页面 HTML
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/get_html \
@@ -51,15 +51,15 @@ curl -X POST http://localhost:3333/api/browser/get_html \
   -d '{"tabId": 123456789, "requestId": "get-content-001"}'
 ```
 
-#### 1.3 Get Result
+#### 1.3 获取结果
 
 ```bash
 curl http://localhost:3333/api/browser/callback_response/get-content-001
 ```
 
-#### 1.4 Or Get Text Content Directly
+#### 1.4 或者直接获取文本内容
 
-If you only need text (without HTML tags):
+如果只需要文本（不需要 HTML 标签）：
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -69,11 +69,11 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
 
 ---
 
-## Scenario 2: Extract Specific Data from Page
+## 场景 2: 提取页面特定数据
 
-**Goal**: Extract specific information from page such as links, tables, lists, etc.
+**目标**: 从页面中提取特定信息，如链接、表格、列表等
 
-### Extract All Links
+### 提取所有链接
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -84,7 +84,7 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   }'
 ```
 
-### Extract All Images
+### 提取所有图片
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -95,7 +95,7 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   }'
 ```
 
-### Extract Table Data
+### 提取表格数据
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -106,10 +106,10 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   }'
 ```
 
-### Extract Specific Element Content
+### 提取特定元素内容
 
 ```bash
-# Extract via CSS selector
+# 通过 CSS 选择器提取
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{
@@ -118,7 +118,7 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   }'
 ```
 
-### Extract Meta Information
+### 提取 meta 信息
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -131,13 +131,13 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
 
 ---
 
-## Scenario 3: Open Multiple URLs in Batch
+## 场景 3: 批量打开多个网址
 
-**Goal**: Open multiple URLs sequentially
+**目标**: 依次打开多个网址
 
-### Steps
+### 步骤
 
-#### 3.1 Open First URL
+#### 3.1 打开第一个网址
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/open_url \
@@ -145,9 +145,9 @@ curl -X POST http://localhost:3333/api/browser/open_url \
   -d '{"url": "https://example.com/page1"}'
 ```
 
-Wait 2-3 seconds for page to load.
+等待 2-3 秒让页面加载。
 
-#### 3.2 Open Second URL
+#### 3.2 打开第二个网址
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/open_url \
@@ -155,7 +155,7 @@ curl -X POST http://localhost:3333/api/browser/open_url \
   -d '{"url": "https://example.com/page2"}'
 ```
 
-#### 3.3 Batch Open Script Example
+#### 3.3 批量打开脚本示例
 
 ```bash
 #!/bin/bash
@@ -167,38 +167,38 @@ URLS=(
 )
 
 for url in "${URLS[@]}"; do
-  echo "Opening: $url"
+  echo "打开: $url"
   curl -s -X POST http://localhost:3333/api/browser/open_url \
     -H "Content-Type: application/json" \
     -d "{\"url\": \"$url\"}"
-  sleep 2  # Wait for page to load
+  sleep 2  # 等待页面加载
 done
 
-echo "Done, getting tab list..."
+echo "完成，获取标签页列表..."
 curl -s http://localhost:3333/api/browser/tabs
 ```
 
 ---
 
-## Scenario 4: Get Login Session Cookies
+## 场景 4: 获取登录态 Cookie
 
-**Goal**: Get cookies from logged-in website for subsequent automation
+**目标**: 获取已登录网站的 Cookie，用于后续自动化操作
 
-### Steps
+### 步骤
 
-#### 4.1 Confirm Logged In
+#### 4.1 确认已登录
 
-Ensure the target website is already logged in within the browser.
+确保目标网站已在浏览器中登录。
 
-#### 4.2 Get Tab
+#### 4.2 获取标签页
 
 ```bash
 curl http://localhost:3333/api/browser/tabs
 ```
 
-Find the tabId of the target website.
+找到目标网站的 tabId。
 
-#### 4.3 Get Cookies
+#### 4.3 获取 Cookie
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/get_cookies \
@@ -206,15 +206,15 @@ curl -X POST http://localhost:3333/api/browser/get_cookies \
   -d '{"tabId": 123456789, "requestId": "cookie-001"}'
 ```
 
-#### 4.4 Get Result
+#### 4.4 获取结果
 
 ```bash
 curl http://localhost:3333/api/browser/callback_response/cookie-001
 ```
 
-#### 4.5 Save Cookies to Database
+#### 4.5 保存 Cookie 到数据库
 
-Save retrieved cookies for later use:
+将获取的 Cookie 保存以便后续使用：
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/save_cookies \
@@ -227,7 +227,7 @@ curl -X POST http://localhost:3333/api/browser/save_cookies \
   }'
 ```
 
-#### 4.6 Query Saved Cookies Later
+#### 4.6 后续查询已保存的 Cookie
 
 ```bash
 curl "http://localhost:3333/api/browser/cookies?domain=example.com"
@@ -235,61 +235,61 @@ curl "http://localhost:3333/api/browser/cookies?domain=example.com"
 
 ---
 
-## Scenario 5: Execute Automation on Pages
+## 场景 5: 在页面执行自动化操作
 
-**Goal**: Auto-fill forms, click buttons, etc.
+**目标**: 自动填写表单、点击按钮等
 
-### Fill Login Form
+### 填写登录表单
 
 ```bash
-# Fill username
+# 填写用户名
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"input[name=username]\").value = \"myuser\""}'
 
-# Fill password
+# 填写密码
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"input[name=password]\").value = \"mypass\""}'
 
-# Click login button
+# 点击登录按钮
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"button[type=submit]\").click()"}'
 ```
 
-### Fill Search Box and Submit
+### 填写搜索框并提交
 
 ```bash
-# Fill search keyword
+# 填写搜索关键词
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
-  -d '{"tabId": 123456789, "code": "document.querySelector(\"input[name=q]\").value = \"search keyword\""}'
+  -d '{"tabId": 123456789, "code": "document.querySelector(\"input[name=q]\").value = \"搜索关键词\""}'
 
-# Submit form
+# 提交表单
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"form\").submit()"}'
 ```
 
-### Scroll Page
+### 滚动页面
 
 ```bash
-# Scroll to bottom
+# 滚动到底部
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "window.scrollTo(0, document.body.scrollHeight)"}'
 
-# Scroll to specific element
+# 滚动到指定元素
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"#target-element\").scrollIntoView()"}'
 ```
 
-### Wait for Element to Appear
+### 等待元素出现
 
 ```bash
-# Check if element exists
+# 检查元素是否存在
 curl -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "!!document.querySelector(\".loading-complete\")"}'
@@ -297,22 +297,22 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
 
 ---
 
-## Scenario 6: Monitor Page Changes
+## 场景 6: 监听页面变化
 
-**Goal**: Monitor browser events in real-time
+**目标**: 实时监听浏览器事件
 
-### Establish SSE Connection
+### 建立 SSE 连接
 
 ```bash
-# Continuously listen for events (-N keeps connection open)
+# 持续监听事件（-N 保持连接）
 curl -N http://localhost:3333/api/browser/events
 ```
 
-### Event Output Example
+### 事件输出示例
 
 ```
 event: connected
-data: {"message":"SSE connection established","timestamp":"2026-01-10T10:00:00.000Z"}
+data: {"message":"SSE连接已建立","timestamp":"2026-01-10T10:00:00.000Z"}
 
 event: tabs_update
 data: {"tabs":[...]}
@@ -324,22 +324,22 @@ event: script_executed
 data: {"tabId":123456789,"result":"Hello World"}
 ```
 
-### Process Events with Script
+### 配合脚本处理事件
 
 ```bash
 #!/bin/bash
 
-# Listen for events and process
+# 监听事件并处理
 curl -N http://localhost:3333/api/browser/events | while read -r line; do
   if [[ $line == data:* ]]; then
     data="${line#data: }"
-    echo "Received event data: $data"
-    # Add processing logic here
+    echo "收到事件数据: $data"
+    # 在这里添加处理逻辑
   fi
 done
 ```
 
-### Send Custom Event
+### 发送自定义事件
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/emit_event \
@@ -349,43 +349,43 @@ curl -X POST http://localhost:3333/api/browser/emit_event \
 
 ---
 
-## Comprehensive Example: Automated Scraping Workflow
+## 综合示例: 自动化采集流程
 
-Here's a complete scraping workflow example:
+以下是一个完整的采集流程示例：
 
 ```bash
 #!/bin/bash
 
 BASE_URL="http://localhost:3333/api/browser"
 
-# 1. Check service status
-echo "Checking service status..."
+# 1. 检查服务状态
+echo "检查服务状态..."
 STATUS=$(curl -s "$BASE_URL/status")
 echo "$STATUS"
 
-# 2. Open target page
-echo "Opening target page..."
+# 2. 打开目标页面
+echo "打开目标页面..."
 curl -s -X POST "$BASE_URL/open_url" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com/products"}'
 
 sleep 3
 
-# 3. Get tab list
-echo "Getting tabs..."
+# 3. 获取标签页列表
+echo "获取标签页..."
 TABS=$(curl -s "$BASE_URL/tabs")
-# Extract newest tab ID (actual use requires JSON parsing)
+# 提取最新打开的标签页 ID（实际使用时需要解析 JSON）
 TAB_ID=$(echo "$TABS" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
-echo "Tab ID: $TAB_ID"
+echo "标签页 ID: $TAB_ID"
 
-# 4. Extract page data
-echo "Extracting product list..."
+# 4. 提取页面数据
+echo "提取产品列表..."
 curl -s -X POST "$BASE_URL/execute_script" \
   -H "Content-Type: application/json" \
   -d "{\"tabId\": $TAB_ID, \"code\": \"Array.from(document.querySelectorAll('.product')).map(p => ({name: p.querySelector('.name')?.innerText, price: p.querySelector('.price')?.innerText}))\"}"
 
-# 5. Get cookies
-echo "Getting cookies..."
+# 5. 获取 Cookie
+echo "获取 Cookie..."
 curl -s -X POST "$BASE_URL/get_cookies" \
   -H "Content-Type: application/json" \
   -d "{\"tabId\": $TAB_ID, \"requestId\": \"cookie-final\"}"
@@ -394,27 +394,27 @@ sleep 1
 
 curl -s "$BASE_URL/callback_response/cookie-final"
 
-# 6. Close tab
-echo "Closing tab..."
+# 6. 关闭标签页
+echo "关闭标签页..."
 curl -s -X POST "$BASE_URL/close_tab" \
   -H "Content-Type: application/json" \
   -d "{\"tabId\": $TAB_ID}"
 
-echo "Done!"
+echo "完成!"
 ```
 
 ---
 
-## Next Steps
+## 下一步
 
-- See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for problem resolution
-- See [API.md](API.md) for detailed API parameters
+- 遇到问题查看 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- 查看 [API.md](API.md) 了解所有 API 详细参数
 
 ---
 
-## Changelog
+## 更新日志
 
 ### v1.0.0 (2026-01-10)
-- Initial version
-- 6 typical usage scenarios
-- Comprehensive example script
+- 初始版本
+- 6 个典型使用场景
+- 综合示例脚本

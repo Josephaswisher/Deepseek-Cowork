@@ -1,28 +1,28 @@
 #!/usr/bin/env node
 
 /**
- * activate_memory.js - Activate Archived Memory
+ * activate_memory.js - 激活归档的记忆
  * 
- * Usage:
+ * 用法：
  *   node activate_memory.js <memory-name>
- *   node activate_memory.js --list          # List all archived memories
- *   node activate_memory.js --search <keyword>  # Search memories
+ *   node activate_memory.js --list          # 列出所有归档记忆
+ *   node activate_memory.js --search <keyword>  # 搜索记忆
  * 
- * Features:
- *   1. Move memory from archive/ back to active/
- *   2. Update main skill index
- *   3. Support listing and searching archived memories
+ * 功能：
+ *   1. 将记忆从 archive/ 移回 active/
+ *   2. 更新主技能索引
+ *   3. 支持列出和搜索归档记忆
  */
 
 const fs = require('fs');
 const path = require('path');
 const { getConfig, ensureDataDir } = require('./paths');
 
-// Config (from paths.js)
+// 配置（从 paths.js 获取）
 const CONFIG = getConfig();
 
 /**
- * Format date time
+ * 格式化日期时间
  */
 function formatDateTime(date = new Date()) {
   const year = date.getFullYear();
@@ -35,7 +35,7 @@ function formatDateTime(date = new Date()) {
 }
 
 /**
- * Read memory info
+ * 读取记忆信息
  */
 function getMemoryInfo(memoryPath) {
   const summaryPath = path.join(memoryPath, 'summary.md');
@@ -46,21 +46,19 @@ function getMemoryInfo(memoryPath) {
   
   const content = fs.readFileSync(summaryPath, 'utf8');
   
-  // Extract topic
-  const titleMatch = content.match(/^# Conversation Memory：(.+)$/m) ||
-                     content.match(/^# 对话记忆：(.+)$/m);
-  const topic = titleMatch ? titleMatch[1].trim() : 'Unknown topic';
+  // 提取主题
+  const titleMatch = content.match(/^# 对话记忆：(.+)$/m);
+  const topic = titleMatch ? titleMatch[1].trim() : '未知主题';
   
-  // Extract keywords
-  const keywordsMatch = content.match(/\*\*Keywords\*\*：(.+)$/m) ||
-                        content.match(/\*\*关键词\*\*：(.+)$/m);
+  // 提取关键词
+  const keywordsMatch = content.match(/\*\*关键词\*\*：(.+)$/m);
   const keywords = keywordsMatch ? keywordsMatch[1].trim() : '';
   
   return { topic, keywords };
 }
 
 /**
- * Get memory list
+ * 获取记忆列表
  */
 function getMemories(dir) {
   const fullDir = path.join(CONFIG.memoriesDir, dir);
@@ -80,7 +78,7 @@ function getMemories(dir) {
         name,
         path: memoryPath,
         mtime: stat.mtime,
-        topic: info ? info.topic : 'Unknown',
+        topic: info ? info.topic : '未知',
         keywords: info ? info.keywords : ''
       };
     })
@@ -88,34 +86,34 @@ function getMemories(dir) {
 }
 
 /**
- * List archived memories
+ * 列出归档记忆
  */
 function listArchivedMemories() {
   const memories = getMemories(CONFIG.archiveDir);
   
   if (memories.length === 0) {
-    console.log('No archived memories');
+    console.log('归档中没有记忆');
     return;
   }
   
-  console.log(`Archived memories (${memories.length} total):\n`);
+  console.log(`归档记忆列表 (共 ${memories.length} 个)：\n`);
   
   memories.forEach((mem, index) => {
     console.log(`${index + 1}. ${mem.name}`);
-    console.log(`   Topic: ${mem.topic}`);
-    console.log(`   Modified: ${formatDateTime(mem.mtime)}`);
+    console.log(`   主题：${mem.topic}`);
+    console.log(`   修改时间：${formatDateTime(mem.mtime)}`);
     if (mem.keywords) {
       const kw = mem.keywords.length > 50 
         ? mem.keywords.substring(0, 50) + '...' 
         : mem.keywords;
-      console.log(`   Keywords: ${kw}`);
+      console.log(`   关键词：${kw}`);
     }
     console.log('');
   });
 }
 
 /**
- * Search memories
+ * 搜索记忆
  */
 function searchMemories(keyword) {
   const activeMemories = getMemories(CONFIG.activeDir);
@@ -127,19 +125,19 @@ function searchMemories(keyword) {
   
   const keywordLower = keyword.toLowerCase();
   const results = allMemories.filter(mem => {
-    // Search name
+    // 搜索名称
     if (mem.name.toLowerCase().includes(keywordLower)) {
       return true;
     }
-    // Search topic
+    // 搜索主题
     if (mem.topic && mem.topic.toLowerCase().includes(keywordLower)) {
       return true;
     }
-    // Search keywords
+    // 搜索关键词
     if (mem.keywords && mem.keywords.toLowerCase().includes(keywordLower)) {
       return true;
     }
-    // Search conversation content
+    // 搜索原始对话内容
     const conversationPath = path.join(mem.path, 'conversation.md');
     if (fs.existsSync(conversationPath)) {
       const content = fs.readFileSync(conversationPath, 'utf8');
@@ -151,28 +149,28 @@ function searchMemories(keyword) {
   });
   
   if (results.length === 0) {
-    console.log(`No memories found containing "${keyword}"`);
+    console.log(`未找到包含 "${keyword}" 的记忆`);
     return;
   }
   
-  console.log(`Search results (${results.length} total):\n`);
+  console.log(`搜索结果 (共 ${results.length} 个)：\n`);
   
   results.forEach((mem, index) => {
-    const locationLabel = mem.location === 'active' ? '[Active]' : '[Archived]';
+    const locationLabel = mem.location === 'active' ? '[活跃]' : '[归档]';
     console.log(`${index + 1}. ${locationLabel} ${mem.name}`);
-    console.log(`   Topic: ${mem.topic}`);
+    console.log(`   主题：${mem.topic}`);
     if (mem.keywords) {
       const kw = mem.keywords.length > 50 
         ? mem.keywords.substring(0, 50) + '...' 
         : mem.keywords;
-      console.log(`   Keywords: ${kw}`);
+      console.log(`   关键词：${kw}`);
     }
     console.log('');
   });
 }
 
 /**
- * Update main skill index (via API call to backend)
+ * 更新主技能索引（通过 API 调用后端）
  */
 async function updateIndex() {
   try {
@@ -181,73 +179,73 @@ async function updateIndex() {
     await updateIndexModule.main();
   } catch (err) {
     console.log('');
-    console.log('Tip: Index update failed, please ensure DeepSeek Cowork app is running');
-    console.log('Or manually run: node scripts/update_index.js');
+    console.log('提示：索引更新失败，请确保 DeepSeek Cowork 应用正在运行');
+    console.log('或手动运行：node scripts/update_index.js');
   }
 }
 
 /**
- * Activate memory
+ * 激活记忆
  */
 async function activateMemory(memoryName) {
-  // Ensure data directory structure exists
+  // 确保数据目录结构存在
   ensureDataDir();
   
   const archivePath = path.join(CONFIG.memoriesDir, CONFIG.archiveDir, memoryName);
   const activePath = path.join(CONFIG.memoriesDir, CONFIG.activeDir, memoryName);
   
-  // Check if memory is in archive
+  // 检查记忆是否在归档中
   if (!fs.existsSync(archivePath)) {
-    // Check if already in active directory
+    // 检查是否已经在活跃目录
     if (fs.existsSync(activePath)) {
-      console.log(`Memory ${memoryName} is already active`);
+      console.log(`记忆 ${memoryName} 已经是活跃状态`);
       return;
     }
     
-    console.error(`Error: Memory not found ${memoryName}`);
+    console.error(`错误：未找到记忆 ${memoryName}`);
     console.log('');
-    console.log('Tip: Use the following command to view archived memories:');
+    console.log('提示：使用以下命令查看归档记忆：');
     console.log('  node scripts/activate_memory.js --list');
     process.exit(1);
   }
   
-  // Ensure active directory exists
+  // 确保活跃目录存在
   const activeDir = path.join(CONFIG.memoriesDir, CONFIG.activeDir);
   if (!fs.existsSync(activeDir)) {
     fs.mkdirSync(activeDir, { recursive: true });
   }
   
-  // Move memory to active directory
+  // 移动记忆到活跃目录
   fs.renameSync(archivePath, activePath);
   
-  console.log(`✓ Memory activated: ${memoryName}`);
-  console.log(`  From: ${archivePath}`);
-  console.log(`  To: ${activePath}`);
+  console.log(`✓ 记忆已激活：${memoryName}`);
+  console.log(`  从：${archivePath}`);
+  console.log(`  到：${activePath}`);
   
-  // Show memory info
+  // 显示记忆信息
   const info = getMemoryInfo(activePath);
   if (info) {
-    console.log(`  Topic: ${info.topic}`);
+    console.log(`  主题：${info.topic}`);
   }
   
-  // Update index (via API)
+  // 更新索引（通过 API）
   await updateIndex();
 }
 
 /**
- * Show help message
+ * 显示帮助信息
  */
 function showHelp() {
-  console.log('activate_memory.js - Activate Archived Memory');
+  console.log('activate_memory.js - 激活归档的记忆');
   console.log('');
-  console.log('Usage:');
-  console.log('  node activate_memory.js <memory-name>     Activate specified memory');
-  console.log('  node activate_memory.js --list            List all archived memories');
-  console.log('  node activate_memory.js --search <keyword> Search memories');
-  console.log('  node activate_memory.js --help            Show help');
+  console.log('用法：');
+  console.log('  node activate_memory.js <memory-name>     激活指定记忆');
+  console.log('  node activate_memory.js --list            列出所有归档记忆');
+  console.log('  node activate_memory.js --search <keyword> 搜索记忆');
+  console.log('  node activate_memory.js --help            显示帮助');
 }
 
-// Main function
+// 主函数
 async function main() {
   const args = process.argv.slice(2);
   
@@ -263,7 +261,7 @@ async function main() {
   
   if (args[0] === '--search') {
     if (!args[1]) {
-      console.error('Error: Please provide search keyword');
+      console.error('错误：请提供搜索关键词');
       process.exit(1);
     }
     searchMemories(args[1]);
@@ -274,6 +272,6 @@ async function main() {
 }
 
 main().catch(err => {
-  console.error('Execution error:', err.message);
+  console.error('执行出错:', err.message);
   process.exit(1);
 });

@@ -1,9 +1,10 @@
 # CLAUDE.md
 
-此文件为 Claude Code (claude.ai/code) 在此代码库中工作时提供指导。
+This file provides guidance for Claude Code (claude.ai/code) when working in this codebase.
 
-## 规则
-- 使用中文进行交流
-- 技能在.claude/skills目录下
-- 要执行任何操作前，先判断技能是否存在，如果技能存在，则优先使用技能
-- 如果无法准确判断用户意图，则询问用户，直到准确判断用户意图为止
+## Rules
+
+- Communicate in English
+- Skills are located in the .claude/skills directory
+- Before performing any operation, check if a relevant skill exists; if so, use that skill first
+- If you cannot accurately determine the user's intent, ask clarifying questions until the intent is clear

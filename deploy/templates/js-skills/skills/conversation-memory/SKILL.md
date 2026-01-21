@@ -1,263 +1,263 @@
 ---
-name: conversation-memory-zh
+name: conversation-memory
 description: >
-  对话记忆管理。当用户说"保存记忆"、"记住这次对话"、"存一下"、"保存对话"、"找找之前的讨论"、"查看历史对话"、"显示之前的记忆"时触发。
+  Conversation memory management. Triggered when the user says "save memory", "remember this conversation", "save it", "save conversation", "find previous discussion", "view history", "show previous memories".
 ---
 
-# 对话记忆技能
+# Conversation Memory Skill
 
-将对话上下文保存为可召回的记忆文件，实现对话的持久化和自动召回。
+Save conversation context as recallable memory files, enabling persistence and automatic recall of conversations.
 
-## 活跃记忆
+## Active Memories
 
-查看 `../../data/conversation-memory/memories/index.md` 获取活跃记忆合集。
+See `../../data/conversation-memory/memories/index.md` for the active memory collection.
 
-> 注意：记忆数据存储在 `.claude/data/conversation-memory/` 目录下，与技能代码分离。
+> Note: Memory data is stored in the `.claude/data/conversation-memory/` directory, separate from the skill code.
 
-## 触发场景
+## Trigger Scenarios
 
-### 保存记忆
+### Save Memory
 
-当用户说以下话语时触发保存：
+Triggered when the user says:
 
-- "保存记忆"
-- "记住这次对话"
-- "存一下"
-- "保存对话"
-- "保存上下文"
+- "Save memory"
+- "Remember this conversation"
+- "Save it"
+- "Save conversation"
+- "Save context"
 
-#### 保存流程（重要）
+#### Save Process (Important)
 
-保存记忆时，**必须先生成标题和摘要**，然后再调用保存命令：
+When saving a memory, **you must first generate the title and summary**, then call the save command:
 
-**步骤 1：生成标题和摘要**
+**Step 1: Generate Title and Summary**
 
-分析当前对话，生成完整的摘要内容：
+Analyze the current conversation and generate complete summary content:
 
-- **标题**：简洁的对话主题（将显示在索引目录中）
-- **摘要**：完整的对话总结，应包含：
-  - 对话背景和主要问题
-  - 讨论的核心内容
-  - 关键决策和结论
-  - 重要的技术细节或代码变更
+- **Title**: Concise topic of the conversation (will be displayed in the index)
+- **Summary**: Complete conversation summary, should include:
+  - Conversation background and main issues
+  - Core content discussed
+  - Key decisions and conclusions
+  - Important technical details or code changes
 
-**步骤 2：写入摘要文件**
+**Step 2: Write Summary File**
 
-将标题和摘要写入临时文件，**格式要求**：
-
-```markdown
-# 标题内容
-
-完整的摘要正文（包含主要内容、关键决策、重要结论等）
-```
-
-文件路径：`.claude/data/conversation-memory/temp/summary.md`
-
-**摘要文件示例：**
+Write the title and summary to a temporary file, **format requirements**:
 
 ```markdown
-# 记忆索引时序问题修复
+# Title Content
 
-本次对话讨论了记忆保存时索引内容为空白的时序问题。
-
-## 主要内容
-
-1. 分析了问题根因：保存时先写入占位摘要再重建索引
-2. 确定了改进方案：先生成摘要后一次性保存
-3. 修改了相关代码：save_memory.js、MemoryService、MemoryManager
-
-## 关键决策
-
-- 采用 --summary-file 方式传入摘要，避免命令行转义问题
-- 摘要文件第一行作为标题，后续内容作为完整摘要
-- 摘要必填，确保索引内容始终完整
-
-## 重要结论
-
-- 保存记忆流程改为"先生成摘要后保存"
-- 索引自动重建，新记忆在最上面
+Complete summary text (including main content, key decisions, important conclusions, etc.)
 ```
 
-**步骤 3：调用保存命令**
+File path: `.claude/data/conversation-memory/temp/summary.md`
+
+**Summary File Example:**
+
+```markdown
+# Memory Index Timing Issue Fix
+
+This conversation discussed the timing issue where memory index content was blank during save.
+
+## Main Content
+
+1. Analyzed the root cause: placeholder summary written first, then index rebuilt
+2. Determined the improvement plan: generate summary first, then save in one step
+3. Modified related code: save_memory.js, MemoryService, MemoryManager
+
+## Key Decisions
+
+- Use --summary-file to pass summary, avoiding command-line escaping issues
+- First line of summary file serves as title, subsequent content as complete summary
+- Summary is required to ensure index content is always complete
+
+## Important Conclusions
+
+- Changed save memory flow to "generate summary first, then save"
+- Index automatically rebuilds, new memories appear at the top
+```
+
+**Step 3: Call Save Command**
 
 ```bash
 node scripts/save_memory.js --summary-file ../../data/conversation-memory/temp/summary.md
 ```
 
-> **注意**：
-> - 摘要文件第一行必须是标题（`# ` 开头）
-> - 标题会显示在索引目录中，格式为 `[mem-xxx] 标题`
-> - 保存成功后可删除临时摘要文件
+> **Notes**:
+> - First line of summary file must be the title (starting with `# `)
+> - Title will be displayed in the index, formatted as `[mem-xxx] Title`
+> - Temporary summary file can be deleted after successful save
 
-### 查看历史对话
+### View History
 
-当用户说以下话语时触发查看历史记忆：
+Triggered when the user says:
 
-- "查看之前的对话"
-- "找找上次的讨论"
-- "恢复记忆 mem-xxx"
-- "显示历史对话"
+- "View previous conversation"
+- "Find last discussion"
+- "Restore memory mem-xxx"
+- "Show history"
 
-### 保存的内容
+### Saved Content
 
-系统保存到 `.claude/data/conversation-memory/memories/active/mem-{timestamp}/`：
+System saves to `.claude/data/conversation-memory/memories/active/mem-{timestamp}/`:
 
 ```text
 mem-{timestamp}/
-├── summary.md      # 对话摘要（标题 + 元信息 + 完整摘要）
-├── conversation.md # 完整的原始对话记录（可读格式）
-└── messages.json   # 原始消息数据（用于查看历史对话）
+├── summary.md      # Conversation summary (title + metadata + full summary)
+├── conversation.md # Complete original conversation record (readable format)
+└── messages.json   # Raw message data (for viewing history)
 ```
 
-**summary.md 结构：**
+**summary.md Structure:**
 
 ```markdown
-# 对话记忆：标题
+# Conversation Memory: Title
 
-## 元信息
+## Metadata
 
-- **时间**：2026-01-18 19:00:00
-- **持续**：约 5 分钟
-- **对话轮次**：10 轮
-- **关键词**：关键词1, 关键词2
-- **conversationId**：conv-xxx
-- **sessionId**：xxx...
+- **Time**: 2026-01-18 19:00:00
+- **Duration**: ~5 minutes
+- **Conversation Rounds**: 10 rounds
+- **Keywords**: keyword1, keyword2
+- **conversationId**: conv-xxx
+- **sessionId**: xxx...
 
-## 摘要
+## Summary
 
-（用户提供的完整摘要内容，包含主要内容、关键决策、重要结论等）
+(User-provided complete summary content, including main content, key decisions, important conclusions, etc.)
 
-## 溯源
+## Source
 
-如需查看完整原始对话，请参阅 [conversation.md](conversation.md)
+For full original conversation, see [conversation.md](conversation.md)
 ```
 
-**索引结构（index.md）：**
+**Index Structure (index.md):**
 
-索引文件包含目录和所有记忆摘要，新的记忆在最上面：
+Index file contains directory and all memory summaries, with newest memories at the top:
 
 ```markdown
-# 对话记忆索引
+# Conversation Memory Index
 
-## 目录
+## Directory
 
-- [mem-20260118-190000] 记忆索引时序问题修复
-- [mem-20260118-180000] 项目架构讨论
+- [mem-20260118-190000] Memory Index Timing Issue Fix
+- [mem-20260118-180000] Project Architecture Discussion
 
 ---
 
 ## mem-20260118-190000
 
-（完整的 summary.md 内容）
+(Complete summary.md content)
 ```
 
-## 召回机制
+## Recall Mechanism
 
-### 主动搜索
+### Active Search
 
-用户说"找找之前关于xxx的讨论"时：
+When user says "find previous discussion about xxx":
 
 ```bash
 node scripts/activate_memory.js --search <keyword>
 ```
 
-### 查看历史流程
+### View History Process
 
-当用户请求查看历史对话时：
+When user requests to view history:
 
-**列出可查看的记忆：**
+**List viewable memories:**
 
 ```bash
-node scripts/restore_memory.js --list       # 列出活跃记忆
-node scripts/restore_memory.js --list-all   # 包含归档记忆
+node scripts/restore_memory.js --list       # List active memories
+node scripts/restore_memory.js --list-all   # Include archived memories
 ```
 
-列表会显示每个记忆的 conversationId（如果有），同一对话的多个片段会标注片段数量。
+The list shows each memory's conversationId (if available), with fragment count noted for multiple fragments from the same conversation.
 
-**查看指定记忆片段：**
+**View specific memory fragment:**
 
 ```bash
 node scripts/restore_memory.js <memory-id>
 ```
 
-**查看完整对话：**
+**View complete conversation:**
 
-同一轮对话可能被多次保存产生多个记忆片段，使用 `--conversation` 选项可以合并查看：
+The same conversation round may be saved multiple times as multiple memory fragments. Use the `--conversation` option to merge and view:
 
 ```bash
 node scripts/restore_memory.js --conversation <conversation-id>
 ```
 
-示例：
+Example:
 
 ```bash
 node scripts/restore_memory.js --conversation conv-20260118-160000
 ```
 
-## 激活机制
+## Activation Mechanism
 
-当归档记忆被召回时，需要激活：
+When an archived memory is recalled, it needs to be activated:
 
 ```bash
 node scripts/activate_memory.js <memory-name>
 ```
 
-激活操作（需要应用运行）：
+Activation operation (requires app running):
 
-- 将记忆从 `memories/archive/` 移回 `memories/active/`
+- Moves memory from `memories/archive/` back to `memories/active/`
 
-## 归档机制
+## Archive Mechanism
 
-### 自动归档规则
+### Automatic Archive Rules
 
-- 超过 14 天未激活的记忆会被归档
-- 保持 active/ 数量 <= 20 个
-- 总 token 超过限制时，归档最旧的记忆
+- Memories inactive for more than 14 days will be archived
+- Keep active/ count <= 20
+- When total tokens exceed limit, archive oldest memories
 
-### 执行归档
+### Execute Archive
 
 ```bash
 node scripts/archive_old_memories.js
 ```
 
-归档后通过后端 API 自动更新索引。
+After archiving, the index is automatically updated via backend API.
 
-## 存储位置
+## Storage Locations
 
-技能代码和数据分离存储：
+Skill code and data are stored separately:
 
 ```text
 .claude/
-├── skills/conversation-memory/    # 技能代码（本目录）
-│   ├── SKILL.md                   # 本文件（技能定义）
-│   ├── scripts/                   # 管理脚本（需要应用运行）
-│   │   ├── paths.js               # 路径解析工具
-│   │   ├── save_memory.js         # 保存记忆（需要提供摘要）
-│   │   ├── activate_memory.js     # 激活/搜索记忆
-│   │   ├── restore_memory.js      # 查看历史对话
-│   │   ├── archive_old_memories.js # 归档记忆
-│   │   └── update_index.js        # 更新索引（调用后端 API）
-│   └── references/                # 模板文件
+├── skills/conversation-memory/    # Skill code (this directory)
+│   ├── SKILL.md                   # This file (skill definition)
+│   ├── scripts/                   # Management scripts (require app running)
+│   │   ├── paths.js               # Path resolution utility
+│   │   ├── save_memory.js         # Save memory (requires summary)
+│   │   ├── activate_memory.js     # Activate/search memory
+│   │   ├── restore_memory.js      # View history
+│   │   ├── archive_old_memories.js # Archive memories
+│   │   └── update_index.js        # Update index (calls backend API)
+│   └── references/                # Template files
 │       ├── summary_template.md
 │       └── conversation_template.md
 │
-└── data/conversation-memory/      # 数据目录（与技能分离）
-    ├── temp/                      # 临时文件目录（保存摘要用）
-    │   └── summary.md             # 临时摘要文件
-    └── memories/                  # 记忆存储
-        ├── index.md               # 活跃记忆摘要合集
-        ├── active/                # 活跃记忆
+└── data/conversation-memory/      # Data directory (separate from skill)
+    ├── temp/                      # Temporary file directory (for summary)
+    │   └── summary.md             # Temporary summary file
+    └── memories/                  # Memory storage
+        ├── index.md               # Active memory summary collection
+        ├── active/                # Active memories
         │   └── mem-xxx/
         │       ├── summary.md
         │       ├── conversation.md
         │       └── messages.json
-        └── archive/               # 归档记忆
+        └── archive/               # Archived memories
 ```
 
-## 注意事项
+## Notes
 
-- **标题和摘要必填**：摘要文件第一行必须是标题（`# ` 开头），标题会显示在索引目录中
-- **索引自动更新**：保存成功后索引会自动重建，新记忆在最上面
-- **脚本依赖应用**：`scripts/` 目录的脚本需要 DeepSeek Cowork 应用运行
-- **查看兼容性**：只有新保存的记忆（包含 `messages.json`）支持查看完整消息
-- **临时文件**：保存成功后可删除 `temp/summary.md` 临时文件
+- **Title and summary are required**: First line of summary file must be title (starting with `# `), title will be displayed in index
+- **Index auto-updates**: Index automatically rebuilds after successful save, new memories at the top
+- **Scripts require app**: Scripts in `scripts/` directory require DeepSeek Cowork app to be running
+- **View compatibility**: Only newly saved memories (containing `messages.json`) support viewing complete messages
+- **Temporary files**: Temporary `temp/summary.md` file can be deleted after successful save

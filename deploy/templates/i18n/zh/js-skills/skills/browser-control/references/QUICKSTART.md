@@ -1,5 +1,5 @@
 ---
-title: Browser Control Quick Start
+title: Browser Control 快速开始
 version: 1.0.0
 created: 2026-01-10
 updated: 2026-01-10
@@ -7,23 +7,23 @@ author: agent-kaichi
 status: stable
 ---
 
-# Browser Control Quick Start
+# Browser Control 快速开始
 
-This document provides ready-to-use curl commands for common Browser Control Manager operations.
+本文档提供 Browser Control Manager 常用操作的即用 curl 命令，可直接复制执行。
 
-**Base URL**: `http://localhost:3333`
+**基础地址**: `http://localhost:3333`
 
 ---
 
-## 1. Check Service Status
+## 1. 检查服务状态
 
-Verify that Browser Control Manager service is running properly.
+确认 Browser Control Manager 服务是否正常运行。
 
 ```bash
 curl http://localhost:3333/api/browser/status
 ```
 
-**Expected Response**:
+**期望返回**:
 
 ```json
 {
@@ -40,21 +40,21 @@ curl http://localhost:3333/api/browser/status
 }
 ```
 
-**Checkpoints**:
-- `isRunning: true` indicates service is running
-- `activeConnections >= 1` indicates browser extension is connected
+**检查点**:
+- `isRunning: true` 表示服务运行中
+- `activeConnections >= 1` 表示浏览器扩展已连接
 
 ---
 
-## 2. Get All Tabs
+## 2. 获取所有标签页
 
-Get tab list from connected browsers.
+获取已连接浏览器的标签页列表。
 
 ```bash
 curl http://localhost:3333/api/browser/tabs
 ```
 
-**Expected Response**:
+**期望返回**:
 
 ```json
 {
@@ -70,44 +70,44 @@ curl http://localhost:3333/api/browser/tabs
 }
 ```
 
-**Extract tabId**:
+**提取 tabId**:
 
-The `id` field of a tab is used for subsequent operations. For example, in the above response, `tabId` is `123456789`.
+标签页的 `id` 字段用于后续操作。例如上例中 `tabId` 为 `123456789`。
 
 ---
 
-## 3. Get Tab HTML
+## 3. 获取指定标签页 HTML
 
-Get complete HTML content of a specified tab.
+获取指定标签页的完整 HTML 内容。
 
 ```bash
-# Replace 123456789 with actual tabId
+# 替换 123456789 为实际的 tabId
 curl -X POST http://localhost:3333/api/browser/get_html \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789}'
 ```
 
-**Note**: This operation is asynchronous. HTML content is returned via SSE event `tab_html_received`, or use `requestId` to poll for results.
+**注意**: 此操作是异步的。HTML 内容通过 SSE 事件 `tab_html_received` 返回，或使用 `requestId` 轮询获取。
 
-**Using requestId**:
+**带 requestId 的方式**:
 
 ```bash
-# Send request
+# 发送请求
 curl -X POST http://localhost:3333/api/browser/get_html \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "requestId": "html-req-001"}'
 
-# Wait a few seconds then get result
+# 等待几秒后获取结果
 curl http://localhost:3333/api/browser/callback_response/html-req-001
 ```
 
 ---
 
-## 4. Execute JavaScript on Page
+## 4. 在页面执行 JavaScript
 
-Execute JavaScript code in a specified tab and get return value.
+在指定标签页中执行 JavaScript 代码并获取返回值。
 
-### Get Page Title
+### 获取页面标题
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -115,7 +115,7 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   -d '{"tabId": 123456789, "code": "document.title"}'
 ```
 
-### Get All Links
+### 获取所有链接
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -123,7 +123,7 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   -d '{"tabId": 123456789, "code": "Array.from(document.querySelectorAll(\"a\")).map(a => ({href: a.href, text: a.textContent.trim()})).filter(a => a.href)"}'
 ```
 
-### Click Element
+### 点击元素
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -131,7 +131,7 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"button.submit\").click()"}'
 ```
 
-### Fill Form
+### 填写表单
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -139,7 +139,7 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
   -d '{"tabId": 123456789, "code": "document.querySelector(\"input[name=search]\").value = \"keyword\""}'
 ```
 
-### Get Page Text Content
+### 获取页面文本内容
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/execute_script \
@@ -149,38 +149,38 @@ curl -X POST http://localhost:3333/api/browser/execute_script \
 
 ---
 
-## 5. Get Page Cookies
+## 5. 获取页面 Cookie
 
-Get cookies for the domain of a specified tab.
+获取指定标签页所在域名的 Cookie。
 
-### Real-time Retrieval from Browser
+### 从浏览器实时获取
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/get_cookies \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "requestId": "cookie-req-001"}'
 
-# Wait then get result
+# 等待后获取结果
 curl http://localhost:3333/api/browser/callback_response/cookie-req-001
 ```
 
-### Query Saved Cookies
+### 查询已保存的 Cookie
 
 ```bash
-# Query all
+# 查询所有
 curl "http://localhost:3333/api/browser/cookies"
 
-# Filter by domain
+# 按域名过滤
 curl "http://localhost:3333/api/browser/cookies?domain=example.com"
 ```
 
 ---
 
-## 6. Open New URL
+## 6. 打开新 URL
 
-Open URL in a new tab or specified tab.
+在新标签页或指定标签页中打开 URL。
 
-### Open New Tab
+### 打开新标签页
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/open_url \
@@ -188,7 +188,7 @@ curl -X POST http://localhost:3333/api/browser/open_url \
   -d '{"url": "https://www.google.com"}'
 ```
 
-### Navigate in Specified Tab
+### 在指定标签页中导航
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/open_url \
@@ -198,9 +198,9 @@ curl -X POST http://localhost:3333/api/browser/open_url \
 
 ---
 
-## 7. Close Tab
+## 7. 关闭标签页
 
-Close a specified tab.
+关闭指定的标签页。
 
 ```bash
 curl -X POST http://localhost:3333/api/browser/close_tab \
@@ -210,35 +210,35 @@ curl -X POST http://localhost:3333/api/browser/close_tab \
 
 ---
 
-## Complete Workflow Example
+## 完整工作流示例
 
-Here's a complete workflow: open page → wait for load → get content → close page
+以下是一个完整的工作流：打开页面 → 等待加载 → 获取内容 → 关闭页面
 
 ```bash
 #!/bin/bash
 
-# 1. Open new tab
-echo "Opening page..."
+# 1. 打开新标签页
+echo "打开页面..."
 curl -s -X POST http://localhost:3333/api/browser/open_url \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com"}'
 
-# Wait for page to load
+# 等待页面加载
 sleep 3
 
-# 2. Get tab list, find newly opened tab
-echo "Getting tab list..."
+# 2. 获取标签页列表，找到新打开的标签页
+echo "获取标签页列表..."
 TABS=$(curl -s http://localhost:3333/api/browser/tabs)
 echo "$TABS"
 
-# 3. Assuming tabId is 123456789, get page title
-echo "Getting page title..."
+# 3. 假设 tabId 为 123456789，获取页面标题
+echo "获取页面标题..."
 curl -s -X POST http://localhost:3333/api/browser/execute_script \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789, "code": "document.title"}'
 
-# 4. Close tab
-echo "Closing tab..."
+# 4. 关闭标签页
+echo "关闭标签页..."
 curl -s -X POST http://localhost:3333/api/browser/close_tab \
   -H "Content-Type: application/json" \
   -d '{"tabId": 123456789}'
@@ -246,17 +246,17 @@ curl -s -X POST http://localhost:3333/api/browser/close_tab \
 
 ---
 
-## Next Steps
+## 下一步
 
-- See [API.md](API.md) for detailed API documentation
-- See [SCENARIOS.md](SCENARIOS.md) for more usage scenarios
-- See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for problem resolution
+- 查看 [API.md](API.md) 了解所有 API 详细说明
+- 查看 [SCENARIOS.md](SCENARIOS.md) 了解更多使用场景
+- 遇到问题查看 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ---
 
-## Changelog
+## 更新日志
 
 ### v1.0.0 (2026-01-10)
-- Initial version
-- 7 ready-to-use curl templates for common operations
-- Complete workflow example
+- 初始版本
+- 7 个常用操作的即用 curl 模板
+- 完整工作流示例

@@ -1,56 +1,157 @@
 #!/usr/bin/env node
 
 /**
- * Browser Control Manager 部署器
+ * Browser Control Manager Deployer
  * 
- * 功能：
- * - 部署 CLAUDE.md 和 .claude/skills/browser-control 到工作目录
- * - 支持 deploy/update/backup/reset/status 操作
+ * Features:
+ * - Deploy CLAUDE.md and .claude/skills/browser-control to work directories
+ * - Support deploy/update/backup/reset/status operations
+ * - Support multi-language deployment (--lang en/zh)
  * 
- * 用法：
- * node deploy [command] [--target name]
+ * Usage:
+ * node deploy [command] [--target name] [--lang en|zh]
  * 
  * Commands:
- *   deploy   部署配置到工作目录
- *   update   更新 references 文档
- *   backup   备份当前配置
- *   reset    重置配置
- *   status   检查配置状态
+ *   deploy   Deploy config to work directories
+ *   update   Update references docs
+ *   backup   Backup current config
+ *   reset    Reset config
+ *   status   Check config status
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// 路径常量
+// Path constants
 const DEPLOY_DIR = __dirname;
 const BCM_ROOT = path.dirname(DEPLOY_DIR);
 const TEMPLATES_DIR = path.join(DEPLOY_DIR, 'templates');
 const SERVER_DOCS_DIR = path.join(BCM_ROOT, 'server', 'docs');
 const HAPPY_CONFIG_PATH = path.join(BCM_ROOT, '..', 'happy-service', 'happy-config.json');
 
-// 技能目录名
+// Skill directory names
 const SKILL_NAME = 'browser-control';
 const SKILL_PATH = `.claude/skills/${SKILL_NAME}`;
 const BACKUP_DIR = '.bcm-backups';
 
-// conversation-memory 技能配置
+// conversation-memory skill config
 const CONVERSATION_MEMORY_SKILL_NAME = 'conversation-memory';
 const CONVERSATION_MEMORY_SKILL_PATH = `.claude/skills/${CONVERSATION_MEMORY_SKILL_NAME}`;
 const CONVERSATION_MEMORY_DATA_PATH = `.claude/data/${CONVERSATION_MEMORY_SKILL_NAME}`;
 
+// i18n messages
+const MESSAGES = {
+    en: {
+        loadedWorkDirs: (count) => `Loaded ${count} work directory config(s)`,
+        configNotFound: (path) => `Config file not found: ${path}`,
+        readConfigFailed: (err) => `Failed to read config file: ${err}`,
+        workDirNotFound: (name) => `Work directory not found: ${name}`,
+        noDeployableDirs: 'No deployable work directories',
+        deployingTo: (name, path) => `Deploying to: ${name} (${path})`,
+        workDirNotExist: (path) => `Work directory does not exist, creating: ${path}`,
+        claudeExists: 'CLAUDE.md already exists, skipping',
+        claudeCreated: 'Created CLAUDE.md',
+        skillExists: (path) => `Skill directory already exists: ${path}, skipping templates`,
+        skillDeployed: (path) => `Deployed skill: ${path}`,
+        syncedDocs: (count) => `Synced ${count} document(s) to references/`,
+        docsSourceNotFound: (path) => `Docs source directory not found: ${path}`,
+        dataCreated: (path) => `Created data directory: ${path}`,
+        deployComplete: (name) => `Deploy complete: ${name}`,
+        updating: (name, path) => `Updating: ${name} (${path})`,
+        skillDirNotExist: (path) => `Skill directory does not exist, please run deploy first: ${path}`,
+        updateComplete: (name) => `Update complete: ${name}`,
+        backingUp: (name, path) => `Backing up: ${name} (${path})`,
+        nothingToBackup: 'Nothing to backup',
+        backedUpTo: (path) => `Backed up to: ${path}`,
+        resetting: (name, path) => `Resetting: ${name} (${path})`,
+        deleted: (path) => `Deleted: ${path}`,
+        resetComplete: (name) => `Reset complete: ${name}`,
+        configSource: (path) => `Config source: ${path}`,
+        docsSource: (path) => `Docs source: ${path}`,
+        filesCount: (count) => `(${count} files)`,
+        refsMissing: (files) => `references missing: ${files}`,
+        usingLanguage: (lang) => `Using language: ${lang}`,
+        memoryIndexTitle: 'Active Memory Index',
+        memoryIndexNote: 'This file is auto-updated, recording all active memory summaries.',
+        memoryIndexTable: 'Index Table',
+        memoryIndexNoMemory: '(No active memories)',
+        memoryIndexKeywords: 'Keywords Summary',
+        memoryIndexNoKeywords: '(No valid keywords)',
+        memoryIndexUsage: 'Usage Instructions',
+        memoryIndexUsage1: '1. Find related memory from index table',
+        memoryIndexUsage2: '2. Read `active/{memoryId}/summary.md` for details',
+        memoryIndexUsage3: '3. Read `active/{memoryId}/conversation.md` for original conversation'
+    },
+    zh: {
+        loadedWorkDirs: (count) => `加载了 ${count} 个工作目录配置`,
+        configNotFound: (path) => `配置文件不存在: ${path}`,
+        readConfigFailed: (err) => `读取配置文件失败: ${err}`,
+        workDirNotFound: (name) => `未找到工作目录: ${name}`,
+        noDeployableDirs: '没有可部署的工作目录',
+        deployingTo: (name, path) => `部署到: ${name} (${path})`,
+        workDirNotExist: (path) => `工作目录不存在，创建: ${path}`,
+        claudeExists: 'CLAUDE.md 已存在，跳过',
+        claudeCreated: '已创建 CLAUDE.md',
+        skillExists: (path) => `技能目录已存在: ${path}，跳过模板文件`,
+        skillDeployed: (path) => `已部署技能: ${path}`,
+        syncedDocs: (count) => `已同步 ${count} 个文档到 references/`,
+        docsSourceNotFound: (path) => `文档源目录不存在: ${path}`,
+        dataCreated: (path) => `已创建数据目录: ${path}`,
+        deployComplete: (name) => `部署完成: ${name}`,
+        updating: (name, path) => `更新: ${name} (${path})`,
+        skillDirNotExist: (path) => `技能目录不存在，请先执行 deploy: ${path}`,
+        updateComplete: (name) => `更新完成: ${name}`,
+        backingUp: (name, path) => `备份: ${name} (${path})`,
+        nothingToBackup: '没有可备份的内容',
+        backedUpTo: (path) => `已备份到: ${path}`,
+        resetting: (name, path) => `重置: ${name} (${path})`,
+        deleted: (path) => `已删除: ${path}`,
+        resetComplete: (name) => `重置完成: ${name}`,
+        configSource: (path) => `配置源: ${path}`,
+        docsSource: (path) => `文档源: ${path}`,
+        filesCount: (count) => `(${count} 个文件)`,
+        refsMissing: (files) => `references 缺失: ${files}`,
+        usingLanguage: (lang) => `使用语言: ${lang}`,
+        memoryIndexTitle: '活跃记忆索引',
+        memoryIndexNote: '此文件由脚本自动更新，记录所有活跃记忆的摘要信息。',
+        memoryIndexTable: '索引表',
+        memoryIndexNoMemory: '（暂无活跃记忆）',
+        memoryIndexKeywords: '关键词汇总',
+        memoryIndexNoKeywords: '（暂无有效关键词）',
+        memoryIndexUsage: '使用说明',
+        memoryIndexUsage1: '1. 根据索引表找到相关记忆',
+        memoryIndexUsage2: '2. 读取对应记忆的 `active/{记忆ID}/summary.md` 了解详情',
+        memoryIndexUsage3: '3. 如需原始对话，读取 `active/{记忆ID}/conversation.md`'
+    }
+};
+
 class BrowserControlDeployer {
-    constructor() {
+    constructor(lang = 'en') {
+        this.lang = lang;
+        this.msg = MESSAGES[lang] || MESSAGES.en;
         this.workDirs = this.loadWorkDirs();
-        this.log('info', `加载了 ${this.workDirs.length} 个工作目录配置`);
+        this.log('info', this.msg.loadedWorkDirs(this.workDirs.length));
     }
 
     /**
-     * 加载工作目录配置
+     * Get source directory based on language
+     * en: templates/js-skills/
+     * zh: templates/i18n/zh/js-skills/
+     */
+    getSourceDir() {
+        if (this.lang === 'zh') {
+            return path.join(TEMPLATES_DIR, 'i18n', 'zh', 'js-skills');
+        }
+        return path.join(TEMPLATES_DIR, 'js-skills');
+    }
+
+    /**
+     * Load work directories config
      */
     loadWorkDirs() {
         if (!fs.existsSync(HAPPY_CONFIG_PATH)) {
-            this.log('warn', `配置文件不存在: ${HAPPY_CONFIG_PATH}`);
+            this.log('warn', this.msg.configNotFound(HAPPY_CONFIG_PATH));
             return [];
         }
 
@@ -61,13 +162,13 @@ class BrowserControlDeployer {
                 path: path.resolve(path.dirname(HAPPY_CONFIG_PATH), dir.path)
             }));
         } catch (err) {
-            this.log('error', `读取配置文件失败: ${err.message}`);
+            this.log('error', this.msg.readConfigFailed(err.message));
             return [];
         }
     }
 
     /**
-     * 日志输出
+     * Log output
      */
     log(level, message, data = null) {
         const prefix = {
@@ -84,13 +185,13 @@ class BrowserControlDeployer {
     }
 
     /**
-     * 获取目标工作目录
+     * Get target work directories
      */
     getTargetDirs(targetName) {
         if (targetName) {
             const target = this.workDirs.find(d => d.name === targetName);
             if (!target) {
-                throw new Error(`未找到工作目录: ${targetName}`);
+                throw new Error(this.msg.workDirNotFound(targetName));
             }
             return [target];
         }
@@ -98,8 +199,7 @@ class BrowserControlDeployer {
     }
 
     /**
-     * 初始化 conversation-memory 数据目录
-     * 在 .claude/data/conversation-memory/memories/ 下创建目录结构和初始 index.md
+     * Initialize conversation-memory data directory
      */
     initConversationMemoryData(workDir) {
         const dataDir = path.join(workDir, CONVERSATION_MEMORY_DATA_PATH);
@@ -108,41 +208,42 @@ class BrowserControlDeployer {
         const archiveDir = path.join(memoriesDir, 'archive');
         const indexFile = path.join(memoriesDir, 'index.md');
 
-        // 创建目录结构
+        // Create directory structure
         for (const dir of [memoriesDir, activeDir, archiveDir]) {
             if (!fs.existsSync(dir)) {
                 fs.mkdirSync(dir, { recursive: true });
             }
         }
 
-        // 创建初始 index.md
+        // Create initial index.md
         if (!fs.existsSync(indexFile)) {
-            const initialContent = `# 活跃记忆索引
+            const m = this.msg;
+            const initialContent = `# ${m.memoryIndexTitle}
 
-> 此文件由脚本自动更新，记录所有活跃记忆的摘要信息。
+> ${m.memoryIndexNote}
 
-## 索引表
+## ${m.memoryIndexTable}
 
 <!-- INDEX_START -->
-| 记忆ID | 主题 | 关键词 | 时间 |
-|--------|------|--------|------|
-| （暂无活跃记忆） | - | - | - |
+| Memory ID | Topic | Keywords | Time |
+|-----------|-------|----------|------|
+| ${m.memoryIndexNoMemory} | - | - | - |
 <!-- INDEX_END -->
 
-## 关键词汇总
+## ${m.memoryIndexKeywords}
 
 <!-- KEYWORDS_START -->
-（暂无有效关键词）
+${m.memoryIndexNoKeywords}
 <!-- KEYWORDS_END -->
 
-## 使用说明
+## ${m.memoryIndexUsage}
 
-1. 根据索引表找到相关记忆
-2. 读取对应记忆的 \`active/{记忆ID}/summary.md\` 了解详情
-3. 如需原始对话，读取 \`active/{记忆ID}/conversation.md\`
+${m.memoryIndexUsage1}
+${m.memoryIndexUsage2}
+${m.memoryIndexUsage3}
 `;
             fs.writeFileSync(indexFile, initialContent, 'utf8');
-            this.log('success', `已创建数据目录: ${CONVERSATION_MEMORY_DATA_PATH}/memories/`);
+            this.log('success', this.msg.dataCreated(`${CONVERSATION_MEMORY_DATA_PATH}/memories/`));
             return true;
         }
         
@@ -150,7 +251,7 @@ class BrowserControlDeployer {
     }
 
     /**
-     * 递归复制目录
+     * Recursively copy directory
      */
     copyDirRecursive(src, dest) {
         if (!fs.existsSync(dest)) {
@@ -172,71 +273,74 @@ class BrowserControlDeployer {
     }
 
     /**
-     * 部署到工作目录
+     * Deploy to work directories
      */
     async deploy(targetName) {
         const targets = this.getTargetDirs(targetName);
         
         if (targets.length === 0) {
-            this.log('error', '没有可部署的工作目录');
+            this.log('error', this.msg.noDeployableDirs);
             return;
         }
 
+        const sourceDir = this.getSourceDir();
+        this.log('info', this.msg.usingLanguage(this.lang));
+
         for (const target of targets) {
-            this.log('info', `部署到: ${target.name} (${target.path})`);
+            this.log('info', this.msg.deployingTo(target.name, target.path));
 
             if (!fs.existsSync(target.path)) {
-                this.log('warn', `工作目录不存在，创建: ${target.path}`);
+                this.log('warn', this.msg.workDirNotExist(target.path));
                 fs.mkdirSync(target.path, { recursive: true });
             }
 
-            // 1. 部署 CLAUDE.md
+            // 1. Deploy CLAUDE.md
             const claudeMdDest = path.join(target.path, 'CLAUDE.md');
-            const claudeMdSrc = path.join(TEMPLATES_DIR, 'CLAUDE.md');
+            const claudeMdSrc = path.join(sourceDir, 'CLAUDE.md');
             
             if (fs.existsSync(claudeMdDest)) {
-                this.log('info', 'CLAUDE.md 已存在，跳过');
+                this.log('info', this.msg.claudeExists);
             } else {
                 fs.copyFileSync(claudeMdSrc, claudeMdDest);
-                this.log('success', '已创建 CLAUDE.md');
+                this.log('success', this.msg.claudeCreated);
             }
 
-            // 2. 部署 .claude/skills/browser-control
+            // 2. Deploy .claude/skills/browser-control
             const skillDest = path.join(target.path, SKILL_PATH);
-            const skillSrc = path.join(TEMPLATES_DIR, 'skills', SKILL_NAME);
+            const skillSrc = path.join(sourceDir, 'skills', SKILL_NAME);
 
             if (fs.existsSync(skillDest)) {
-                this.log('info', `技能目录已存在: ${SKILL_PATH}，跳过模板文件`);
+                this.log('info', this.msg.skillExists(SKILL_PATH));
             } else {
                 this.copyDirRecursive(skillSrc, skillDest);
-                this.log('success', `已部署技能: ${SKILL_PATH}`);
+                this.log('success', this.msg.skillDeployed(SKILL_PATH));
             }
 
-            // 3. 同步 server/docs 到 references
+            // 3. Sync server/docs to references
             await this.syncReferences(target.path);
 
-            // 4. 部署 conversation-memory 技能
+            // 4. Deploy conversation-memory skill
             const convMemSkillDest = path.join(target.path, CONVERSATION_MEMORY_SKILL_PATH);
-            const convMemSkillSrc = path.join(TEMPLATES_DIR, 'skills', CONVERSATION_MEMORY_SKILL_NAME);
+            const convMemSkillSrc = path.join(sourceDir, 'skills', CONVERSATION_MEMORY_SKILL_NAME);
 
             if (fs.existsSync(convMemSkillSrc)) {
                 if (fs.existsSync(convMemSkillDest)) {
-                    this.log('info', `技能目录已存在: ${CONVERSATION_MEMORY_SKILL_PATH}，跳过模板文件`);
+                    this.log('info', this.msg.skillExists(CONVERSATION_MEMORY_SKILL_PATH));
                 } else {
                     this.copyDirRecursive(convMemSkillSrc, convMemSkillDest);
-                    this.log('success', `已部署技能: ${CONVERSATION_MEMORY_SKILL_PATH}`);
+                    this.log('success', this.msg.skillDeployed(CONVERSATION_MEMORY_SKILL_PATH));
                 }
 
-                // 5. 初始化 conversation-memory 数据目录
+                // 5. Initialize conversation-memory data directory
                 this.initConversationMemoryData(target.path);
             }
 
-            this.log('success', `部署完成: ${target.name}`);
+            this.log('success', this.msg.deployComplete(target.name));
         }
     }
 
     /**
-     * 同步 references 文档
+     * Sync references docs
      */
     async syncReferences(workDir) {
         const refDest = path.join(workDir, SKILL_PATH, 'references');
@@ -246,7 +350,7 @@ class BrowserControlDeployer {
         }
 
         if (!fs.existsSync(SERVER_DOCS_DIR)) {
-            this.log('warn', `文档源目录不存在: ${SERVER_DOCS_DIR}`);
+            this.log('warn', this.msg.docsSourceNotFound(SERVER_DOCS_DIR));
             return;
         }
 
@@ -254,7 +358,7 @@ class BrowserControlDeployer {
         let syncCount = 0;
 
         for (const doc of docs) {
-            // 跳过 CONTRIBUTING.md，不需要部署到工作目录
+            // Skip CONTRIBUTING.md
             if (doc === 'CONTRIBUTING.md') {
                 continue;
             }
@@ -266,43 +370,43 @@ class BrowserControlDeployer {
             syncCount++;
         }
 
-        this.log('success', `已同步 ${syncCount} 个文档到 references/`);
+        this.log('success', this.msg.syncedDocs(syncCount));
     }
 
     /**
-     * 更新 references（仅同步文档）
+     * Update references (sync docs only)
      */
     async update(targetName) {
         const targets = this.getTargetDirs(targetName);
 
         for (const target of targets) {
-            this.log('info', `更新: ${target.name} (${target.path})`);
+            this.log('info', this.msg.updating(target.name, target.path));
 
             const skillDir = path.join(target.path, SKILL_PATH);
             if (!fs.existsSync(skillDir)) {
-                this.log('warn', `技能目录不存在，请先执行 deploy: ${skillDir}`);
+                this.log('warn', this.msg.skillDirNotExist(skillDir));
                 continue;
             }
 
             await this.syncReferences(target.path);
-            this.log('success', `更新完成: ${target.name}`);
+            this.log('success', this.msg.updateComplete(target.name));
         }
     }
 
     /**
-     * 备份当前配置
+     * Backup current config
      */
     async backup(targetName) {
         const targets = this.getTargetDirs(targetName);
 
         for (const target of targets) {
-            this.log('info', `备份: ${target.name} (${target.path})`);
+            this.log('info', this.msg.backingUp(target.name, target.path));
 
             const skillDir = path.join(target.path, SKILL_PATH);
             const claudeMd = path.join(target.path, 'CLAUDE.md');
 
             if (!fs.existsSync(skillDir) && !fs.existsSync(claudeMd)) {
-                this.log('warn', '没有可备份的内容');
+                this.log('warn', this.msg.nothingToBackup);
                 continue;
             }
 
@@ -317,56 +421,50 @@ class BrowserControlDeployer {
 
             fs.mkdirSync(backupPath, { recursive: true });
 
-            // 备份 CLAUDE.md
+            // Backup CLAUDE.md
             if (fs.existsSync(claudeMd)) {
                 fs.copyFileSync(claudeMd, path.join(backupPath, 'CLAUDE.md'));
             }
 
-            // 备份技能目录
+            // Backup skill directory
             if (fs.existsSync(skillDir)) {
                 this.copyDirRecursive(skillDir, path.join(backupPath, SKILL_NAME));
             }
 
-            this.log('success', `已备份到: ${backupPath}`);
+            this.log('success', this.msg.backedUpTo(backupPath));
         }
     }
 
     /**
-     * 重置配置
+     * Reset config
      */
     async reset(targetName, skipBackup = false) {
         const targets = this.getTargetDirs(targetName);
 
         for (const target of targets) {
-            this.log('info', `重置: ${target.name} (${target.path})`);
+            this.log('info', this.msg.resetting(target.name, target.path));
 
-            // 先备份
+            // Backup first
             if (!skipBackup) {
                 await this.backup(target.name);
             }
 
-            // 删除技能目录
+            // Delete skill directory
             const skillDir = path.join(target.path, SKILL_PATH);
             if (fs.existsSync(skillDir)) {
                 fs.rmSync(skillDir, { recursive: true, force: true });
-                this.log('info', `已删除: ${SKILL_PATH}`);
+                this.log('info', this.msg.deleted(SKILL_PATH));
             }
 
-            // 删除 CLAUDE.md（可选，这里保留）
-            // const claudeMd = path.join(target.path, 'CLAUDE.md');
-            // if (fs.existsSync(claudeMd)) {
-            //     fs.unlinkSync(claudeMd);
-            // }
-
-            // 重新部署
+            // Redeploy
             await this.deploy(target.name);
 
-            this.log('success', `重置完成: ${target.name}`);
+            this.log('success', this.msg.resetComplete(target.name));
         }
     }
 
     /**
-     * 检查配置状态
+     * Check config status
      */
     async status(targetName) {
         const targets = this.getTargetDirs(targetName);
@@ -396,45 +494,55 @@ class BrowserControlDeployer {
 
                 if (exists && check.type === 'dir') {
                     const files = fs.readdirSync(check.path);
-                    extra = ` (${files.length} 个文件)`;
+                    extra = ` ${this.msg.filesCount(files.length)}`;
                 }
 
                 console.log(`   ${icon} ${check.name}${extra}`);
             }
 
-            // 检查 references 与源文档的差异
+            // Check references vs source docs
             if (fs.existsSync(refDir) && fs.existsSync(SERVER_DOCS_DIR)) {
                 const srcDocs = fs.readdirSync(SERVER_DOCS_DIR).filter(f => f.endsWith('.md') && f !== 'CONTRIBUTING.md');
                 const refDocs = fs.readdirSync(refDir).filter(f => f.endsWith('.md'));
                 
                 const missing = srcDocs.filter(d => !refDocs.includes(d));
                 if (missing.length > 0) {
-                    console.log(`   ⚠️ references missing: ${missing.join(', ')}`);
+                    console.log(`   ⚠️ ${this.msg.refsMissing(missing.join(', '))}`);
                 }
             }
 
             console.log('');
         }
 
-        console.log(`配置源: ${TEMPLATES_DIR}`);
-        console.log(`文档源: ${SERVER_DOCS_DIR}`);
+        console.log(this.msg.configSource(this.getSourceDir()));
+        console.log(this.msg.docsSource(SERVER_DOCS_DIR));
         console.log('');
     }
 }
 
-// CLI 入口
+// CLI entry
 async function main() {
     const args = process.argv.slice(2);
     const command = args[0] || 'status';
     
-    // 解析 --target 参数
+    // Parse --target parameter
     let targetName = null;
     const targetIndex = args.indexOf('--target');
     if (targetIndex !== -1 && args[targetIndex + 1]) {
         targetName = args[targetIndex + 1];
     }
 
-    const deployer = new BrowserControlDeployer();
+    // Parse --lang parameter (default: en)
+    let lang = 'en';
+    const langIndex = args.indexOf('--lang');
+    if (langIndex !== -1 && args[langIndex + 1]) {
+        const langArg = args[langIndex + 1].toLowerCase();
+        if (langArg === 'zh' || langArg === 'cn' || langArg === 'chinese') {
+            lang = 'zh';
+        }
+    }
+
+    const deployer = new BrowserControlDeployer(lang);
 
     try {
         switch (command) {
@@ -472,32 +580,34 @@ async function main() {
 
 function showHelp() {
     console.log(`
-Browser Control Manager 部署器
+Browser Control Manager Deployer
 
-用法: node deploy [command] [options]
+Usage: node deploy [command] [options]
 
 Commands:
-  deploy              部署配置到工作目录
-  update              更新 references 文档
-  backup              备份当前配置
-  reset               重置配置（先备份再重新部署）
-  status              检查配置状态（默认）
-  help                显示帮助信息
+  deploy              Deploy config to work directories
+  update              Update references docs
+  backup              Backup current config
+  reset               Reset config (backup first, then redeploy)
+  status              Check config status (default)
+  help                Show help message
 
 Options:
-  --target <name>     指定目标工作目录（按 name）
-  --no-backup         reset 时跳过备份
+  --target <name>     Specify target work directory (by name)
+  --lang <en|zh>      Specify language (default: en)
+  --no-backup         Skip backup when resetting
 
 Examples:
-  node deploy deploy              # 部署到所有工作目录
-  node deploy deploy --target main  # 部署到 main 工作目录
-  node deploy update              # 更新所有工作目录的 references
-  node deploy status              # 查看部署状态
-  node deploy reset --no-backup   # 重置（不备份）
+  node deploy deploy                    # Deploy to all work directories (English)
+  node deploy deploy --lang zh          # Deploy to all work directories (Chinese)
+  node deploy deploy --target main      # Deploy to 'main' work directory
+  node deploy update                    # Update all work directories' references
+  node deploy status                    # Check deployment status
+  node deploy reset --no-backup         # Reset (without backup)
 `);
 }
 
-// 如果直接运行此脚本
+// If run directly
 if (require.main === module) {
     main();
 }

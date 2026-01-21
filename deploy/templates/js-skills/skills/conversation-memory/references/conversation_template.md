@@ -1,74 +1,74 @@
-# 原始对话模板
+# Original Conversation Template
 
-此模板用于保存完整的原始对话内容，作为溯源层。
+This template is used to save complete original conversation content as a trace layer.
 
-## 模板内容
+## Template Content
 
 ```markdown
-# 原始对话记录
+# Original Conversation Record
 
-## 对话信息
+## Conversation Info
 
-- **开始时间**：{YYYY-MM-DD HH:MM:SS}
-- **结束时间**：{YYYY-MM-DD HH:MM:SS}
-- **对话轮次**：{N} 轮
-
----
-
-## 对话内容
-
-### 用户 [{HH:MM:SS}]
-
-{用户的第一条消息}
+- **Start Time**: {YYYY-MM-DD HH:MM:SS}
+- **End Time**: {YYYY-MM-DD HH:MM:SS}
+- **Conversation Rounds**: {N} rounds
 
 ---
 
-### Claude [{HH:MM:SS}]
+## Conversation Content
 
-{Claude 的第一条回复}
+### User [{HH:MM:SS}]
 
----
-
-### 用户 [{HH:MM:SS}]
-
-{用户的第二条消息}
+{User's first message}
 
 ---
 
 ### Claude [{HH:MM:SS}]
 
-{Claude 的第二条回复}
+{Claude's first response}
 
 ---
 
-（继续记录所有对话轮次...）
+### User [{HH:MM:SS}]
+
+{User's second message}
+
+---
+
+### Claude [{HH:MM:SS}]
+
+{Claude's second response}
+
+---
+
+(Continue recording all conversation rounds...)
 ```
 
-## 填写说明
+## Field Instructions
 
-### 对话信息
+### Conversation Info
 
-- **开始时间**：对话第一条消息的时间
-- **结束时间**：对话最后一条消息的时间
-- **对话轮次**：用户发言的总次数
+- **Start Time**: Time of first message in conversation
+- **End Time**: Time of last message in conversation
+- **Conversation Rounds**: Total number of user messages
 
-### 对话内容
+### Conversation Content
 
-1. **保留完整内容**：不要省略或概括，保留原始对话的完整内容
-2. **标注发言者**：使用 `### 用户` 和 `### Claude` 区分
-3. **标注时间**：如果有时间信息，在方括号中标注
-4. **使用分隔线**：每轮对话之间用 `---` 分隔，便于阅读
+1. **Preserve complete content**: Don't omit or summarize, preserve complete original conversation content
+2. **Label speakers**: Use `### User` and `### Claude` to distinguish
+3. **Label timestamps**: Include timestamps in square brackets if available
+4. **Use separators**: Separate each conversation round with `---` for readability
 
-### 特殊内容处理
+### Special Content Handling
 
-#### 代码块
+#### Code Blocks
 
-保留原始代码块格式：
+Preserve original code block format:
 
 ```markdown
 ### Claude [{HH:MM:SS}]
 
-这是一个示例代码：
+Here's an example code:
 
 \`\`\`javascript
 function hello() {
@@ -77,25 +77,25 @@ function hello() {
 \`\`\`
 ```
 
-#### 长内容
+#### Long Content
 
-如果某条消息特别长（如大段代码），可以完整保留，不要截断。
+If a message is particularly long (like large code blocks), preserve it completely, don't truncate.
 
-#### 图片/文件引用
+#### Image/File References
 
-如果对话中涉及图片或文件，记录其路径或描述：
+If conversation involves images or files, record their path or description:
 
 ```markdown
-### 用户 [{HH:MM:SS}]
+### User [{HH:MM:SS}]
 
-[附件：screenshot.png - 系统架构图]
+[Attachment: screenshot.png - System architecture diagram]
 
-请帮我分析这个架构...
+Please help me analyze this architecture...
 ```
 
-## 为什么需要原始对话
+## Why Original Conversation is Needed
 
-1. **溯源**：摘要可能遗漏细节，原始对话是最准确的记录
-2. **上下文**：理解决策的背景和讨论过程
-3. **搜索**：可以在原始对话中搜索特定内容
-4. **学习**：回顾之前的讨论方式和思路
+1. **Traceability**: Summaries may miss details, original conversation is the most accurate record
+2. **Context**: Understand the background and discussion process of decisions
+3. **Search**: Can search for specific content in original conversation
+4. **Learning**: Review previous discussion approaches and thought processes
