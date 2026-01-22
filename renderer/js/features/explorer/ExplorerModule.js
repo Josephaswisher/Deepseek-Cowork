@@ -536,6 +536,7 @@ class ExplorerModule {
     const ext = filePath.split('.').pop()?.toLowerCase() || '';
     const previewableExts = ['txt', 'md', 'js', 'ts', 'jsx', 'tsx', 'json', 'html', 'css', 'scss', 'less', 'xml', 'yaml', 'yml', 'toml', 'ini', 'conf', 'sh', 'bash', 'zsh', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'php', 'sql', 'vue', 'svelte', 'astro'];
     const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'];
+    const pdfExts = ['pdf'];
     const renderableExts = ['html', 'htm', 'md'];
     const markdownExts = ['md'];
     
@@ -642,7 +643,14 @@ class ExplorerModule {
       }
       
       // 根据文件类型渲染
-      if (imageExts.includes(ext)) {
+      if (pdfExts.includes(ext)) {
+        // PDF 文件预览
+        if (this.elements.filePreviewCode) this.elements.filePreviewCode.style.display = 'none';
+        if (this.elements.previewEditBtn) this.elements.previewEditBtn.style.display = 'none';
+        if (this.elements.previewViewToggle) this.elements.previewViewToggle.style.display = 'none';
+        this.previewFileType = 'pdf';
+        await this.renderPdfPreview(filePath, fileInfo);
+      } else if (imageExts.includes(ext)) {
         if (this.elements.filePreviewCode) this.elements.filePreviewCode.style.display = 'none';
         if (this.elements.previewEditBtn) this.elements.previewEditBtn.style.display = 'none';
         this.renderImagePreview(filePath, ext, fileInfo);
@@ -664,7 +672,7 @@ class ExplorerModule {
       }
       
       // 创建或激活标签页
-      const fileType = imageExts.includes(ext) ? 'image' : this.previewFileType;
+      const fileType = pdfExts.includes(ext) ? 'pdf' : (imageExts.includes(ext) ? 'image' : this.previewFileType);
       this.createOrActivateTab(filePath, content, fileType);
       
     } catch (error) {
@@ -710,6 +718,12 @@ class ExplorerModule {
     if (this.elements.markdownPreview) {
       this.elements.markdownPreview.innerHTML = '';
       this.elements.markdownPreview.style.display = 'none';
+    }
+    
+    // 清理 PDF 预览资源
+    if (this._pdfCleanup) {
+      this._pdfCleanup();
+      this._pdfCleanup = null;
     }
     
     this.filePreviewPath = null;
@@ -1540,6 +1554,231 @@ class ExplorerModule {
     container.querySelector('.zoom-in-btn')?.addEventListener('click', () => zoomTo(scale * 1.25));
     container.querySelector('.zoom-fit-btn')?.addEventListener('click', fitToView);
     container.querySelector('.zoom-actual-btn')?.addEventListener('click', () => zoomTo(1));
+  }
+
+  /**
+   * 渲染 PDF 预览
+   * @param {string} filePath - 文件路径
+   * @param {Object} fileInfo - 文件信息
+   */
+  async renderPdfPreview(filePath, fileInfo) {
+    const contentEl = this.elements.filePreviewContent;
+    if (!contentEl) return;
+
+    const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
+    const formatFileSize = this.app?.formatFileSize?.bind(this.app) || ((b) => b + ' bytes');
+
+    // 创建 PDF 预览容器
+    const container = document.createElement('div');
+    container.className = 'pdf-preview-container';
+    container.innerHTML = `
+      <div class="pdf-viewer">
+        <div class="pdf-loading">
+          <div class="spinner"></div>
+          <span>${t('common.loading')}</span>
+        </div>
+      </div>
+      <div class="pdf-toolbar">
+        <button class="pdf-prev-btn" title="${t('explorer.preview.pdfPrev') || 'Previous Page'}">◀</button>
+        <span class="pdf-page-info">
+          <input type="number" class="pdf-page-input" min="1" value="1">
+          <span class="pdf-page-separator">/</span>
+          <span class="pdf-total-pages">-</span>
+        </span>
+        <button class="pdf-next-btn" title="${t('explorer.preview.pdfNext') || 'Next Page'}">▶</button>
+        <span class="pdf-toolbar-divider"></span>
+        <button class="pdf-zoom-out-btn" title="${t('explorer.preview.zoomOut') || 'Zoom Out'}">−</button>
+        <span class="pdf-zoom-level">100%</span>
+        <button class="pdf-zoom-in-btn" title="${t('explorer.preview.zoomIn') || 'Zoom In'}">+</button>
+        <button class="pdf-zoom-fit-btn" title="${t('explorer.preview.fit') || 'Fit Width'}">↔</button>
+      </div>
+      <div class="pdf-info">
+        <span class="pdf-size">${fileInfo ? formatFileSize(fileInfo.size) : '-'}</span>
+        <span class="pdf-format">PDF</span>
+      </div>
+    `;
+
+    contentEl.innerHTML = '';
+    contentEl.appendChild(container);
+
+    const viewer = container.querySelector('.pdf-viewer');
+    const loadingEl = container.querySelector('.pdf-loading');
+    const pageInput = container.querySelector('.pdf-page-input');
+    const totalPagesEl = container.querySelector('.pdf-total-pages');
+    const zoomLevelEl = container.querySelector('.pdf-zoom-level');
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let scale = 1.0;
+    let canvas = null;
+    let ctx = null;
+
+    // 检测运行环境
+    const isWebMode = window.browserControlManager?._isPolyfill === true || 
+                      (typeof process === 'undefined' || !process.versions?.electron);
+
+    try {
+      // 等待 PDF.js 库加载
+      if (!window.pdfjsLib && window.pdfjsLibPromise) {
+        await window.pdfjsLibPromise;
+      }
+      
+      if (!window.pdfjsLib) {
+        throw new Error('PDF.js library not loaded');
+      }
+
+      // 获取 PDF 二进制数据
+      let pdfData;
+      if (isWebMode) {
+        // Web 版：通过 API 获取
+        const result = await window.browserControlManager?.readFileBinary?.(filePath);
+        if (!result?.success) {
+          throw new Error(result?.error || 'Failed to read PDF file');
+        }
+        pdfData = result.data;
+      } else {
+        // Electron 版：通过 IPC 获取
+        const result = await window.browserControlManager?.readFileBinary?.(filePath);
+        if (!result?.success) {
+          throw new Error(result?.error || 'Failed to read PDF file');
+        }
+        pdfData = result.data;
+      }
+
+      // 加载 PDF 文档
+      const loadingTask = window.pdfjsLib.getDocument({ data: pdfData });
+      pdfDoc = await loadingTask.promise;
+      totalPages = pdfDoc.numPages;
+      totalPagesEl.textContent = totalPages;
+      pageInput.max = totalPages;
+
+      // 移除加载提示
+      loadingEl.remove();
+
+      // 创建画布
+      canvas = document.createElement('canvas');
+      canvas.className = 'pdf-canvas';
+      ctx = canvas.getContext('2d');
+      viewer.appendChild(canvas);
+
+      // 渲染指定页面
+      const renderPage = async (pageNum) => {
+        if (!pdfDoc || pageNum < 1 || pageNum > totalPages) return;
+
+        currentPage = pageNum;
+        pageInput.value = pageNum;
+
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: scale });
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport
+        };
+
+        await page.render(renderContext).promise;
+      };
+
+      // 适应宽度
+      const fitWidth = async () => {
+        if (!pdfDoc) return;
+        const page = await pdfDoc.getPage(currentPage);
+        const viewerWidth = viewer.clientWidth - 40;
+        const defaultViewport = page.getViewport({ scale: 1 });
+        scale = viewerWidth / defaultViewport.width;
+        zoomLevelEl.textContent = `${Math.round(scale * 100)}%`;
+        await renderPage(currentPage);
+      };
+
+      // 缩放
+      const zoom = async (factor) => {
+        scale = Math.max(0.25, Math.min(4, scale * factor));
+        zoomLevelEl.textContent = `${Math.round(scale * 100)}%`;
+        await renderPage(currentPage);
+      };
+
+      // 初始渲染：适应宽度
+      await fitWidth();
+
+      // 事件绑定
+      container.querySelector('.pdf-prev-btn')?.addEventListener('click', () => {
+        if (currentPage > 1) renderPage(currentPage - 1);
+      });
+
+      container.querySelector('.pdf-next-btn')?.addEventListener('click', () => {
+        if (currentPage < totalPages) renderPage(currentPage + 1);
+      });
+
+      pageInput.addEventListener('change', () => {
+        const page = parseInt(pageInput.value, 10);
+        if (page >= 1 && page <= totalPages) {
+          renderPage(page);
+        } else {
+          pageInput.value = currentPage;
+        }
+      });
+
+      pageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          pageInput.blur();
+        }
+      });
+
+      container.querySelector('.pdf-zoom-out-btn')?.addEventListener('click', () => zoom(0.8));
+      container.querySelector('.pdf-zoom-in-btn')?.addEventListener('click', () => zoom(1.25));
+      container.querySelector('.pdf-zoom-fit-btn')?.addEventListener('click', fitWidth);
+
+      // 滚轮缩放
+      viewer.addEventListener('wheel', (e) => {
+        if (e.ctrlKey) {
+          e.preventDefault();
+          zoom(e.deltaY > 0 ? 0.9 : 1.1);
+        }
+      }, { passive: false });
+
+      // 键盘导航
+      const handleKeydown = (e) => {
+        if (document.activeElement === pageInput) return;
+        
+        switch (e.key) {
+          case 'ArrowLeft':
+          case 'PageUp':
+            if (currentPage > 1) renderPage(currentPage - 1);
+            break;
+          case 'ArrowRight':
+          case 'PageDown':
+            if (currentPage < totalPages) renderPage(currentPage + 1);
+            break;
+          case 'Home':
+            renderPage(1);
+            break;
+          case 'End':
+            renderPage(totalPages);
+            break;
+        }
+      };
+      
+      document.addEventListener('keydown', handleKeydown);
+      
+      // 清理函数（当预览关闭时移除事件监听）
+      this._pdfCleanup = () => {
+        document.removeEventListener('keydown', handleKeydown);
+        pdfDoc?.destroy();
+        pdfDoc = null;
+      };
+
+    } catch (error) {
+      console.error('[ExplorerModule] Failed to render PDF:', error);
+      loadingEl.innerHTML = `
+        <span style="color: var(--destructive);">
+          ${t('errors.pdfLoadFailed') || 'Failed to load PDF'}: ${this.escapeHtml(error.message)}
+        </span>
+      `;
+    }
   }
 
   async saveFileContent() {

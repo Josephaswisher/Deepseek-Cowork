@@ -1810,6 +1810,36 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('fs:readFileBinary', async (event, filePath) => {
+    try {
+      const resolvedPath = fileManager._validatePath(filePath);
+      const stats = await fs.promises.stat(resolvedPath);
+      
+      // 限制文件大小（50MB）
+      if (stats.size > 50 * 1024 * 1024) {
+        return {
+          success: false,
+          error: '文件太大（最大 50MB）'
+        };
+      }
+      
+      const buffer = await fs.promises.readFile(resolvedPath);
+      // 返回 Uint8Array，Electron IPC 会自动序列化
+      return {
+        success: true,
+        path: filePath,
+        data: new Uint8Array(buffer),
+        size: stats.size
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code
+      };
+    }
+  });
+
   ipcMain.handle('fs:saveFileContent', async (event, filePath, content) => {
     try {
       const resolvedPath = fileManager._validatePath(filePath);

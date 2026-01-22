@@ -1036,6 +1036,177 @@ body.dark .markdown-preview pre {
   stroke-width: 1.5;
 }
 
+/* ===== PDF 预览 ===== */
+.pdf-preview-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--muted);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* PDF 查看器 */
+.pdf-viewer {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.pdf-canvas {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: white;
+}
+
+/* PDF 工具栏 */
+.pdf-toolbar {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--glass-bg, rgba(0, 0, 0, 0.7));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius);
+  z-index: 10;
+}
+
+.pdf-toolbar button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms);
+  font-size: 1rem;
+}
+
+.pdf-toolbar button:hover {
+  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.1));
+}
+
+.pdf-toolbar button:active {
+  transform: scale(0.95);
+}
+
+.pdf-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdf-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.pdf-page-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+}
+
+.pdf-page-input {
+  width: 40px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.pdf-page-input::-webkit-outer-spin-button,
+.pdf-page-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pdf-page-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.pdf-page-separator {
+  color: var(--muted-foreground);
+}
+
+.pdf-total-pages {
+  min-width: 24px;
+}
+
+.pdf-zoom-level {
+  min-width: 48px;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono, monospace);
+}
+
+/* PDF 信息栏 */
+.pdf-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.pdf-info span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* PDF 加载状态 */
+.pdf-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--muted-foreground);
+}
+
+.pdf-loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 /* ===== 当前预览文件高亮 ===== */
 .file-item.previewing {
   background: rgba(255, 255, 255, 0.1);

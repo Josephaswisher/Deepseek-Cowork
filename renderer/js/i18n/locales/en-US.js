@@ -201,7 +201,16 @@
         unsupported: 'This file type is not supported for preview',
         imageNotSupported: 'Image preview is not supported yet',
         sourceView: 'Source',
-        renderedView: 'Preview'
+        renderedView: 'Preview',
+        // PDF preview
+        pdfPrev: 'Previous Page',
+        pdfNext: 'Next Page',
+        pdfPage: 'Page {current} of {total}',
+        // Common zoom
+        zoomIn: 'Zoom In',
+        zoomOut: 'Zoom Out',
+        fit: 'Fit to Window',
+        actualSize: 'Actual Size'
       },
       layout: {
         splitView: 'Split View',
@@ -575,7 +584,10 @@
       saveFailed: 'Save failed',
       connectionFailed: 'Connection failed',
       timeoutError: 'Request timeout',
-      unknownError: 'Unknown error'
+      unknownError: 'Unknown error',
+      pdfLoadFailed: 'Failed to load PDF',
+      imageLoadFailed: 'Failed to load image',
+      readFailed: 'Failed to read file'
     },
     
     // Notifications

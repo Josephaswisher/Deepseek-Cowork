@@ -1058,6 +1058,13 @@ contextBridge.exposeInMainWorld('browserControlManager', {
   readFileContent: (filePath) => ipcRenderer.invoke('fs:readFileContent', filePath),
 
   /**
+   * 读取二进制文件内容（用于 PDF 等二进制文件预览）
+   * @param {string} filePath - 文件路径
+   * @returns {Promise<Object>} { success, path, data: Uint8Array } 或 { success: false, error }
+   */
+  readFileBinary: (filePath) => ipcRenderer.invoke('fs:readFileBinary', filePath),
+
+  /**
    * 保存文件内容
    * @param {string} filePath - 文件路径
    * @param {string} content - 文件内容

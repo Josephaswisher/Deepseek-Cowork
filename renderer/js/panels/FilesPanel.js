@@ -777,8 +777,9 @@ class FilesPanel {
       const ext = item.name.split('.').pop()?.toLowerCase() || '';
       const previewableExts = ['txt', 'md', 'js', 'ts', 'jsx', 'tsx', 'json', 'html', 'css', 'scss', 'less', 'xml', 'yaml', 'yml', 'toml', 'ini', 'conf', 'sh', 'bash', 'zsh', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'php', 'sql', 'vue', 'svelte', 'astro', 'log'];
       const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'];
+      const pdfExts = ['pdf'];
       
-      if (previewableExts.includes(ext) || imageExts.includes(ext)) {
+      if (previewableExts.includes(ext) || imageExts.includes(ext) || pdfExts.includes(ext)) {
         // 使用内置预览功能
         await this.app.openFilePreview(item.path);
       } else {

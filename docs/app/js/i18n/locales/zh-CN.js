@@ -201,7 +201,16 @@
         unsupported: '此文件类型不支持预览',
         imageNotSupported: '图片预览暂不支持',
         sourceView: '源码',
-        renderedView: '预览'
+        renderedView: '预览',
+        // PDF 预览
+        pdfPrev: '上一页',
+        pdfNext: '下一页',
+        pdfPage: '第 {current} 页，共 {total} 页',
+        // 通用缩放
+        zoomIn: '放大',
+        zoomOut: '缩小',
+        fit: '适应窗口',
+        actualSize: '实际大小'
       },
       layout: {
         splitView: '分栏视图',
@@ -575,7 +584,10 @@
       saveFailed: '保存失败',
       connectionFailed: '连接失败',
       timeoutError: '请求超时',
-      unknownError: '未知错误'
+      unknownError: '未知错误',
+      pdfLoadFailed: '加载 PDF 失败',
+      imageLoadFailed: '加载图片失败',
+      readFailed: '读取文件失败'
     },
     
     // 通知消息
