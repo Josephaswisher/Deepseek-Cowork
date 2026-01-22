@@ -11,7 +11,7 @@
     <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT" />
   </a>
   <a href="https://github.com/imjszhang/deepseek-cowork">
-    <img src="https://img.shields.io/badge/Version-0.1.7-blue.svg?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/Version-0.1.8-blue.svg?style=flat-square" alt="Version" />
   </a>
   <a href="https://www.electronjs.org/">
     <img src="https://img.shields.io/badge/Electron-28.x-47848F?style=flat-square&logo=electron" alt="Electron" />
@@ -191,7 +191,7 @@ deepseek-cowork open
 
 ### CLI 命令参考
 
-> **CLI 版本**: `deepseek-cowork@0.1.7`
+> **CLI 版本**: `deepseek-cowork@0.1.8`
 
 | 命令 | 说明 |
 |------|------|
@@ -291,6 +291,6 @@ MIT
 
 [![X](https://img.shields.io/badge/X-@imjszhang-000000?logo=x)](https://x.com/imjszhang)
 
-*当前版本: V0.1.7 | 最后更新: 2026-01-23*
+*当前版本: V0.1.8 | 最后更新: 2026-01-23*
 
 </div>
