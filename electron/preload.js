@@ -1118,7 +1118,24 @@ contextBridge.exposeInMainWorld('browserControlManager', {
    * @param {string} content - 文件内容
    * @returns {Promise<Object>} { success, path, message } 或 { success: false, error }
    */
-  saveFileContent: (filePath, content) => ipcRenderer.invoke('fs:saveFileContent', filePath, content)
+  saveFileContent: (filePath, content) => ipcRenderer.invoke('fs:saveFileContent', filePath, content),
+
+  // ============ 文件系统事件监听（用于实时更新文件列表）============
+
+  /**
+   * 监听文件系统变化事件
+   * @param {Function} callback - 回调函数 (data: { type, path, oldPath?, isDirectory? })
+   *   type: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir' | 'rename'
+   *   path: 变化的文件/目录路径
+   *   oldPath: 重命名时的原路径
+   *   isDirectory: 是否为目录
+   * @returns {Function} 取消监听函数
+   */
+  onFileChanged: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('fs:fileChanged', handler);
+    return () => ipcRenderer.removeListener('fs:fileChanged', handler);
+  }
 });
 
 // 暴露平台信息

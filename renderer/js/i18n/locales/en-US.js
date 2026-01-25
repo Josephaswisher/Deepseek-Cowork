@@ -84,8 +84,20 @@
       switchTo: 'Switch',
       currentSession: 'Current',
       noSessions: 'No other active sessions',
-      noMessages: 'No messages yet',
+      noMessages: 'Waiting for input...',
       loading: 'Loading...',
+      // New: Search and view
+      searchPlaceholder: 'Search sessions...',
+      viewKanban: 'Kanban View',
+      viewList: 'List View',
+      // New: Footer
+      totalPrefix: '',
+      totalSuffix: 'active sessions',
+      pressKey: 'Press',
+      toClosePanel: 'to close panel',
+      // New: Card
+      messagesUnit: 'messages',
+      aiReplying: 'AI is replying...',
       status: {
         idle: 'Idle',
         processing: 'Processing',

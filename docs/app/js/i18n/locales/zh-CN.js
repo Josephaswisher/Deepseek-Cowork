@@ -81,9 +81,23 @@
     sessionHub: {
       title: '会话中心',
       switchDir: '切换到新工作目录',
-      currentSession: '当前会话',
+      switchTo: '切换',
+      currentSession: '当前',
       noSessions: '暂无其他活动会话',
+      noMessages: '等待输入...',
       loading: '加载中...',
+      // 新增：搜索和视图
+      searchPlaceholder: '搜索会话...',
+      viewKanban: '看板视图',
+      viewList: '列表视图',
+      // 新增：Footer
+      totalPrefix: '共',
+      totalSuffix: '个活动会话',
+      pressKey: '按',
+      toClosePanel: '关闭面板',
+      // 新增：卡片
+      messagesUnit: '条消息',
+      aiReplying: 'AI 正在回复...',
       status: {
         idle: '空闲',
         processing: '处理中',

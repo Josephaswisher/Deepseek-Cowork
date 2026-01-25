@@ -123,7 +123,9 @@ class WebSocketClient {
             'daemon:statusChanged',
             'daemon:startProgress',
             // session 状态更新事件
-            'session:stateUpdated'
+            'session:stateUpdated',
+            // 消息添加事件（供看板实时更新）
+            'message:added'
         ];
         
         events.forEach(event => {

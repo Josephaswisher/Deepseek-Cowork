@@ -159,6 +159,9 @@ class FilesPanel {
     this.elements.filesRefreshBtn?.addEventListener('click', () => this.refresh());
     this.elements.filesNewFolderBtn?.addEventListener('click', () => this.showNewFolderDialog());
     
+    // Electron 环境下监听 IPC 文件变化事件（用于实时更新文件列表）
+    this.setupFileChangeListener();
+    
     // 新建文件夹对话框
     this.elements.newFolderCreateBtn?.addEventListener('click', () => this.createNewFolder());
     this.elements.newFolderCancelBtn?.addEventListener('click', () => this.hideNewFolderDialog());
@@ -235,6 +238,81 @@ class FilesPanel {
         this.hideEmptyAreaContextMenu();
       }
     });
+  }
+
+  /**
+   * 设置 Electron IPC 文件变化事件监听
+   * 仅在 Electron 环境下生效，用于实时更新文件列表
+   */
+  setupFileChangeListener() {
+    // 检测是否为 Electron 环境（非 polyfill 模式）
+    const isElectron = window.browserControlManager && 
+                       typeof window.browserControlManager.onFileChanged === 'function';
+    
+    if (!isElectron) {
+      console.log('[FilesPanel] Not in Electron mode, skipping IPC file change listener');
+      return;
+    }
+    
+    console.log('[FilesPanel] Setting up Electron IPC file change listener');
+    
+    // 防抖定时器
+    this._fileChangeDebounceTimer = null;
+    
+    // 监听文件变化事件
+    this._unsubscribeFileChanged = window.browserControlManager.onFileChanged((data) => {
+      console.log('[FilesPanel] Received file change event:', data);
+      
+      // 使用防抖避免频繁刷新
+      if (this._fileChangeDebounceTimer) {
+        clearTimeout(this._fileChangeDebounceTimer);
+      }
+      
+      this._fileChangeDebounceTimer = setTimeout(() => {
+        this.handleFileChangeEvent(data);
+      }, 300);
+    });
+    
+    console.log('[FilesPanel] File change listener registered');
+  }
+
+  /**
+   * 处理文件变化事件
+   * @param {Object} data 事件数据 { type, path, oldPath?, isDirectory?, timestamp }
+   */
+  handleFileChangeEvent(data) {
+    const { type, path: changedPath } = data;
+    
+    console.log('[FilesPanel] Processing file change:', type, changedPath);
+    
+    // 检查变化的文件是否在当前目录下
+    if (!this.currentPath || !changedPath) {
+      console.log('[FilesPanel] No current path or changed path, refreshing anyway');
+      this.refresh();
+      return;
+    }
+    
+    // 标准化路径分隔符进行比较
+    const normalizedCurrentPath = this.currentPath.replace(/\\/g, '/').toLowerCase();
+    const normalizedChangedPath = changedPath.replace(/\\/g, '/').toLowerCase();
+    
+    // 获取变化文件的父目录
+    const changedDir = normalizedChangedPath.substring(0, normalizedChangedPath.lastIndexOf('/'));
+    
+    // 判断变化是否发生在当前目录或其父目录
+    const isInCurrentDir = normalizedChangedPath.startsWith(normalizedCurrentPath + '/') ||
+                           changedDir === normalizedCurrentPath ||
+                           normalizedCurrentPath.startsWith(changedDir);
+    
+    // 对于新增、删除、重命名操作，且发生在当前目录，刷新列表
+    if (['add', 'addDir', 'unlink', 'unlinkDir', 'rename'].includes(type)) {
+      if (isInCurrentDir || changedDir === normalizedCurrentPath) {
+        console.log('[FilesPanel] Change in current directory, refreshing');
+        this.refresh();
+      } else {
+        console.log('[FilesPanel] Change not in current directory, skipping refresh');
+      }
+    }
   }
 
   /**
@@ -1299,7 +1377,18 @@ class FilesPanel {
    * 销毁面板
    */
   destroy() {
-    // 清理事件监听器
+    // 清理文件变化事件监听器
+    if (this._unsubscribeFileChanged) {
+      this._unsubscribeFileChanged();
+      this._unsubscribeFileChanged = null;
+    }
+    
+    // 清理防抖定时器
+    if (this._fileChangeDebounceTimer) {
+      clearTimeout(this._fileChangeDebounceTimer);
+      this._fileChangeDebounceTimer = null;
+    }
+    
     console.log('[FilesPanel] Destroyed');
   }
 }

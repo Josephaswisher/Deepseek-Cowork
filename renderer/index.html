@@ -1083,18 +1083,80 @@
       
       <!-- Session Hub Panel (floating overlay) -->
       <aside id="session-hub-panel" class="session-hub-panel" style="display: none;">
+        <!-- Header -->
         <div class="session-hub-header">
-          <h3 data-i18n="sessionHub.title">Session Hub</h3>
-          <button id="session-hub-close-btn" class="session-hub-close" data-i18n-title="common.close" title="Close">&times;</button>
+          <div class="session-hub-header-left">
+            <div class="session-hub-logo">
+              <svg viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            </div>
+            <div class="session-hub-title-group">
+              <h3 data-i18n="sessionHub.title">会话中心</h3>
+              <p class="subtitle">Session Hub</p>
+            </div>
+          </div>
+          <div class="session-hub-header-right">
+            <!-- 搜索框 -->
+            <div class="session-hub-search">
+              <span class="session-hub-search-icon">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              </span>
+              <input type="text" id="session-hub-search-input" class="session-hub-search-input" data-i18n-placeholder="sessionHub.searchPlaceholder" placeholder="搜索会话...">
+            </div>
+            <!-- 视图切换 -->
+            <div class="session-hub-view-toggle">
+              <button class="view-toggle-btn active" data-view="kanban" data-i18n-title="sessionHub.viewKanban" title="看板视图">
+                <svg viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+              </button>
+              <button class="view-toggle-btn" data-view="list" data-i18n-title="sessionHub.viewList" title="列表视图">
+                <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              </button>
+            </div>
+            <!-- 关闭按钮 -->
+            <button id="session-hub-close-btn" class="session-hub-close" data-i18n-title="common.close" title="关闭">
+              <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
-        <div class="session-hub-actions">
-          <button id="session-hub-new-dir-btn" class="session-hub-new-dir-btn" data-i18n-title="sessionHub.switchDir" title="Switch to new working directory">
-            <svg viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><line x1="12" x2="12" y1="10" y2="16"/><line x1="9" x2="15" y1="13" y2="13"/></svg>
-            <span data-i18n="sessionHub.switchDir">Switch to new directory</span>
+        <!-- Stats Bar -->
+        <div class="session-hub-stats" id="session-hub-stats">
+          <div class="session-hub-stats-left">
+            <div class="stat-item" id="stat-idle">
+              <span class="status-dot idle"></span>
+              <span data-i18n="sessionHub.status.idle">空闲</span>
+              <span class="count">0</span>
+            </div>
+            <div class="stat-item" id="stat-processing">
+              <span class="status-dot processing"></span>
+              <span data-i18n="sessionHub.status.processing">处理中</span>
+              <span class="count">0</span>
+            </div>
+            <div class="stat-item" id="stat-connected">
+              <span class="status-dot connected"></span>
+              <span data-i18n="sessionHub.status.connected">已连接</span>
+              <span class="count">0</span>
+            </div>
+          </div>
+          <button id="session-hub-new-dir-btn" class="session-hub-new-dir-btn" data-i18n-title="sessionHub.switchDir" title="切换到新工作目录">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+            <span data-i18n="sessionHub.switchDir">切换到新工作目录</span>
           </button>
         </div>
+        <!-- Session List -->
         <div class="session-hub-list" id="session-hub-list">
           <!-- Session cards will be rendered dynamically -->
+        </div>
+        <!-- Footer -->
+        <div class="session-hub-footer" id="session-hub-footer">
+          <p class="session-hub-footer-left">
+            <span data-i18n="sessionHub.totalPrefix">共</span>
+            <span class="count" id="session-hub-total-count">0</span>
+            <span data-i18n="sessionHub.totalSuffix">个活动会话</span>
+          </p>
+          <p class="session-hub-footer-right">
+            <span data-i18n="sessionHub.pressKey">按</span>
+            <kbd>ESC</kbd>
+            <span data-i18n="sessionHub.toClosePanel">关闭面板</span>
+          </p>
         </div>
       </aside>
     </div>

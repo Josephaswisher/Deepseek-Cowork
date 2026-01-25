@@ -1747,6 +1747,23 @@ function setupIpcHandlers() {
 
   // ============ 文件系统 IPC 处理器 ============
 
+  /**
+   * 发送文件系统变化事件到渲染进程
+   * @param {string} type - 事件类型: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir' | 'rename'
+   * @param {string} filePath - 文件/目录路径
+   * @param {Object} extra - 额外信息 { oldPath?, isDirectory? }
+   */
+  function emitFileChanged(type, filePath, extra = {}) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('fs:fileChanged', {
+        type,
+        path: filePath,
+        ...extra,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
   ipcMain.handle('fs:getWorkspaceRoot', () => {
     try {
       return {
@@ -1763,13 +1780,17 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('fs:createFolder', async (event, folderPath) => {
-    return await fileManager.createFolder(folderPath);
+    const result = await fileManager.createFolder(folderPath);
+    if (result.success) {
+      emitFileChanged('addDir', result.path || folderPath, { isDirectory: true });
+    }
+    return result;
   });
 
   ipcMain.handle('fs:deleteItem', async (event, itemPath, skipConfirm = false) => {
     // 如果不跳过确认，显示确认对话框
     if (!skipConfirm && mainWindow && !mainWindow.isDestroyed()) {
-      const result = await dialog.showMessageBox(mainWindow, {
+      const confirmResult = await dialog.showMessageBox(mainWindow, {
         type: 'warning',
         buttons: ['取消', '删除'],
         defaultId: 0,
@@ -1779,16 +1800,25 @@ function setupIpcHandlers() {
         detail: `路径: ${itemPath}\n\n此操作无法撤销。`
       });
       
-      if (result.response === 0) {
+      if (confirmResult.response === 0) {
         return { success: false, cancelled: true };
       }
     }
     
-    return await fileManager.deleteItem(itemPath);
+    const result = await fileManager.deleteItem(itemPath);
+    if (result.success) {
+      const eventType = result.wasDirectory ? 'unlinkDir' : 'unlink';
+      emitFileChanged(eventType, result.path || itemPath, { isDirectory: result.wasDirectory });
+    }
+    return result;
   });
 
   ipcMain.handle('fs:renameItem', async (event, oldPath, newPath) => {
-    return await fileManager.renameItem(oldPath, newPath);
+    const result = await fileManager.renameItem(oldPath, newPath);
+    if (result.success) {
+      emitFileChanged('rename', result.newPath || newPath, { oldPath: result.oldPath || oldPath });
+    }
+    return result;
   });
 
   ipcMain.handle('fs:openFile', async (event, filePath) => {
@@ -1804,11 +1834,21 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('fs:copyItem', async (event, sourcePath, destPath) => {
-    return await fileManager.copyItem(sourcePath, destPath);
+    const result = await fileManager.copyItem(sourcePath, destPath);
+    if (result.success) {
+      // 复制操作相当于在目标位置添加文件/目录
+      emitFileChanged('add', result.destPath || destPath);
+    }
+    return result;
   });
 
   ipcMain.handle('fs:moveItem', async (event, sourcePath, destPath) => {
-    return await fileManager.moveItem(sourcePath, destPath);
+    const result = await fileManager.moveItem(sourcePath, destPath);
+    if (result.success) {
+      // 移动操作发送 rename 事件
+      emitFileChanged('rename', result.destPath || destPath, { oldPath: result.sourcePath || sourcePath });
+    }
+    return result;
   });
 
   ipcMain.handle('fs:refreshWorkspaceDir', () => {
@@ -1870,6 +1910,9 @@ function setupIpcHandlers() {
     try {
       const resolvedPath = fileManager._validatePath(filePath);
       
+      // 判断是新建还是修改
+      const isNewFile = !fs.existsSync(resolvedPath);
+      
       // 确保目录存在
       const dirPath = path.dirname(resolvedPath);
       if (!fs.existsSync(dirPath)) {
@@ -1877,6 +1920,10 @@ function setupIpcHandlers() {
       }
       
       await fs.promises.writeFile(resolvedPath, content, 'utf8');
+      
+      // 发送文件变化事件
+      emitFileChanged(isNewFile ? 'add' : 'change', resolvedPath, { isDirectory: false });
+      
       return {
         success: true,
         path: filePath,

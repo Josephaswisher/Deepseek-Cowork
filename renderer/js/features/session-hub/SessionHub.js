@@ -3,6 +3,7 @@
  * 管理和监控所有活动 session，支持快速切换工作目录
  * 
  * @created 2026-01-25
+ * @updated 2026-01-25 (UI升级：网格布局、终端风格预览、统计栏)
  * @module features/session-hub/SessionHub
  */
 
@@ -181,25 +182,25 @@ class SessionHub {
   }
 
   /**
-   * 增量更新指定卡片的消息区
+   * 增量更新指定卡片的消息区（终端风格）
    * @param {string} sessionId session ID
    */
   updateCardMessages(sessionId) {
     const card = this.elements.list?.querySelector(`.session-card[data-session-id="${sessionId}"]`);
     if (!card) return;
     
-    const previewArea = card.querySelector('.message-preview');
-    if (!previewArea) return;
+    const terminalBody = card.querySelector('.terminal-body');
+    if (!terminalBody) return;
     
     const messages = this.sessionMessages[sessionId] || [];
     const t = this.getTranslator();
     
     if (messages.length === 0) {
-      previewArea.innerHTML = `<p class="no-messages">${t('sessionHub.noMessages')}</p>`;
+      terminalBody.innerHTML = `<div class="terminal-empty">$ ${t('sessionHub.noMessages')}</div>`;
     } else {
-      previewArea.innerHTML = messages.map(msg => this.renderPreviewMessage(msg)).join('');
+      terminalBody.innerHTML = messages.map(msg => this.renderTerminalLine(msg)).join('');
       // 滚动到底部
-      previewArea.scrollTop = previewArea.scrollHeight;
+      terminalBody.scrollTop = terminalBody.scrollHeight;
     }
   }
 
@@ -232,7 +233,15 @@ class SessionHub {
       panel: document.getElementById('session-hub-panel'),
       closeBtn: document.getElementById('session-hub-close-btn'),
       newDirBtn: document.getElementById('session-hub-new-dir-btn'),
-      list: document.getElementById('session-hub-list')
+      list: document.getElementById('session-hub-list'),
+      // 新增元素
+      stats: document.getElementById('session-hub-stats'),
+      footer: document.getElementById('session-hub-footer'),
+      totalCount: document.getElementById('session-hub-total-count'),
+      searchInput: document.getElementById('session-hub-search-input'),
+      statIdle: document.getElementById('stat-idle'),
+      statProcessing: document.getElementById('stat-processing'),
+      statConnected: document.getElementById('stat-connected')
     };
   }
 
@@ -251,6 +260,19 @@ class SessionHub {
     
     // ESC 键关闭
     document.addEventListener('keydown', this.handleKeyDown);
+    
+    // 视图切换按钮
+    const viewToggleBtns = this.elements.panel?.querySelectorAll('.view-toggle-btn');
+    viewToggleBtns?.forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewToggleBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // 视图切换功能暂不实现，仅切换样式
+      });
+    });
+    
+    // 搜索功能（暂不实现）
+    // this.elements.searchInput?.addEventListener('input', (e) => this.handleSearch(e.target.value));
   }
 
   /**
@@ -364,6 +386,8 @@ class SessionHub {
       } else {
         this.sessions = [];
         this.renderEmpty();
+        this.updateStats();
+        this.updateFooter();
       }
     } catch (error) {
       console.error('[SessionHub] Load sessions failed:', error);
@@ -449,10 +473,60 @@ class SessionHub {
   }
 
   /**
+   * 更新统计栏
+   */
+  updateStats() {
+    if (!this.elements.stats) return;
+    
+    // 统计各状态数量
+    const counts = {
+      idle: 0,
+      processing: 0,
+      connected: 0
+    };
+    
+    this.sessions.forEach(session => {
+      const status = this.getStatusClass(session.status);
+      if (counts.hasOwnProperty(status)) {
+        counts[status]++;
+      } else {
+        counts.idle++; // 默认为 idle
+      }
+    });
+    
+    // 更新 DOM
+    if (this.elements.statIdle) {
+      const countEl = this.elements.statIdle.querySelector('.count');
+      if (countEl) countEl.textContent = counts.idle;
+    }
+    if (this.elements.statProcessing) {
+      const countEl = this.elements.statProcessing.querySelector('.count');
+      if (countEl) countEl.textContent = counts.processing;
+    }
+    if (this.elements.statConnected) {
+      const countEl = this.elements.statConnected.querySelector('.count');
+      if (countEl) countEl.textContent = counts.connected;
+    }
+  }
+
+  /**
+   * 更新 Footer
+   */
+  updateFooter() {
+    if (this.elements.totalCount) {
+      this.elements.totalCount.textContent = this.sessions.length;
+    }
+  }
+
+  /**
    * 渲染 session 列表
    */
   renderSessionList() {
     if (!this.elements.list) return;
+    
+    // 更新统计栏和 Footer
+    this.updateStats();
+    this.updateFooter();
     
     if (this.sessions.length === 0) {
       this.renderEmpty();
@@ -460,7 +534,7 @@ class SessionHub {
     }
     
     const t = this.getTranslator();
-    const html = this.sessions.map(session => this.renderSessionCard(session, t)).join('');
+    const html = this.sessions.map((session, index) => this.renderSessionCard(session, t, index)).join('');
     this.elements.list.innerHTML = html;
     
     // 绑定卡片点击事件
@@ -468,54 +542,131 @@ class SessionHub {
   }
 
   /**
-   * 渲染单个 session 卡片（看板模式）
+   * 渲染单个 session 卡片（看板模式 - 终端风格）
    * @param {Object} session session 数据
    * @param {Function} t 翻译函数
+   * @param {number} index 索引，用于动画延迟
    * @returns {string} HTML 字符串
    */
-  renderSessionCard(session, t) {
+  renderSessionCard(session, t, index = 0) {
     // 优先使用后端提供的 isCurrent 字段（权威数据）
-    // 只有当 isCurrent 未定义时才使用本地判断（兼容旧数据/API 加载场景）
     const isCurrent = session.isCurrent !== undefined 
         ? session.isCurrent 
         : (session.name === this.currentSessionId || 
            session.workspaceDir === this.app?.workspaceSettings?.getWorkspaceDir?.());
     const statusClass = this.getStatusClass(session.status);
     const statusText = t(`sessionHub.status.${session.status}`) || session.status || 'idle';
+    const isProcessing = statusClass === 'processing';
     
-    // 格式化路径显示（截取最后两级目录）
-    const displayPath = this.formatPath(session.workspaceDir || session.name || 'Unknown');
+    // 格式化路径显示
+    const displayName = this.getDisplayName(session.workspaceDir || session.name || 'Unknown');
+    const fullPath = session.workspaceDir || session.name || '';
     
     // 获取该 session 的消息预览
     const messages = this.sessionMessages[session.sessionId] || [];
-    const messagesHtml = messages.length > 0 
-      ? messages.map(msg => this.renderPreviewMessage(msg)).join('')
-      : `<p class="no-messages">${t('sessionHub.noMessages')}</p>`;
+    const msgCount = messages.length;
+    
+    // 终端内容
+    const terminalContent = messages.length > 0 
+      ? messages.map(msg => this.renderTerminalLine(msg, isProcessing)).join('')
+      : `<div class="terminal-empty">$ ${t('sessionHub.noMessages')}</div>`;
+    
+    // 动画延迟
+    const animDelay = (index * 0.05).toFixed(2);
     
     return `
       <div class="session-card ${isCurrent ? 'current' : ''}" 
            data-session-id="${this.escapeHtml(session.sessionId || '')}"
-           data-workspace-dir="${this.escapeHtml(session.workspaceDir || '')}">
+           data-workspace-dir="${this.escapeHtml(fullPath)}"
+           style="animation-delay: ${animDelay}s;">
+        <!-- Card Header -->
         <div class="session-card-header">
           <div class="session-card-title">
-            <span class="session-card-path" title="${this.escapeHtml(session.workspaceDir || '')}">${this.escapeHtml(displayPath)}</span>
-            <div class="session-card-status">
-              <span class="session-card-status-dot ${statusClass}"></span>
-              <span class="session-card-status-text">${this.escapeHtml(statusText)}</span>
+            <div class="session-card-meta">
+              ${isCurrent ? `<span class="session-card-current-badge">${t('sessionHub.currentSession')}</span>` : ''}
+              <div class="session-card-status">
+                <span class="session-card-status-dot ${statusClass}"></span>
+                <span class="session-card-status-text">${this.escapeHtml(statusText)}</span>
+              </div>
             </div>
+            <h3 class="session-card-path" title="${this.escapeHtml(fullPath)}">${this.escapeHtml(displayName)}</h3>
+            <p class="session-card-fullpath" title="${this.escapeHtml(fullPath)}">${this.escapeHtml(fullPath)}</p>
           </div>
           <div class="session-card-actions">
-            ${isCurrent 
-              ? `<span class="session-card-badge">${t('sessionHub.currentSession')}</span>` 
-              : `<button class="switch-btn" title="${t('sessionHub.switchTo')}">${t('sessionHub.switchTo')}</button>`
-            }
+            ${!isCurrent ? `
+              <button class="switch-btn" title="${t('sessionHub.switchTo')}">
+                <svg viewBox="0 0 24 24"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                ${t('sessionHub.switchTo')}
+              </button>
+            ` : ''}
           </div>
         </div>
-        <div class="message-preview">
-          ${messagesHtml}
+        
+        <!-- Terminal Preview -->
+        <div class="terminal-preview">
+          <div class="terminal-header">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-title">session</span>
+          </div>
+          <div class="terminal-body">
+            ${terminalContent}
+          </div>
+        </div>
+        
+        <!-- Card Footer -->
+        <div class="session-card-footer">
+          <span class="session-card-msg-count">${msgCount} ${t('sessionHub.messagesUnit')}</span>
+          ${isProcessing ? `
+            <span class="session-card-typing">
+              <span class="session-card-typing-dot"></span>
+              ${t('sessionHub.aiReplying')}
+            </span>
+          ` : ''}
         </div>
       </div>
     `;
+  }
+
+  /**
+   * 渲染终端行（消息预览）
+   * @param {Object} msg 消息对象 { role, text, timestamp }
+   * @param {boolean} isLastProcessing 是否是最后一条且正在处理
+   * @returns {string} HTML 字符串
+   */
+  renderTerminalLine(msg, isLastProcessing = false) {
+    const isUser = msg.role === 'user';
+    const roleClass = isUser ? 'user' : 'assistant';
+    // 用户消息用 →，AI 完成消息用 ✓，AI 处理中用 ⋯
+    let prefix = '→';
+    if (!isUser) {
+      prefix = isLastProcessing ? '⋯' : '✓';
+    }
+    const text = this.escapeHtml(msg.text || '');
+    
+    return `
+      <div class="terminal-line ${roleClass}">
+        <span class="prefix">${prefix}</span>
+        <span class="content">${text}</span>
+      </div>
+    `;
+  }
+
+  /**
+   * 获取显示名称（目录名）
+   * @param {string} fullPath 完整路径
+   * @returns {string}
+   */
+  getDisplayName(fullPath) {
+    if (!fullPath) return 'Unknown';
+    
+    // 统一路径分隔符
+    const normalized = fullPath.replace(/\\/g, '/');
+    const parts = normalized.split('/').filter(p => p);
+    
+    // 取最后一级目录名
+    return parts[parts.length - 1] || 'Unknown';
   }
 
   /**
@@ -686,7 +837,7 @@ class SessionHub {
   }
 
   /**
-   * 格式化路径显示
+   * 格式化路径显示（兼容方法）
    * @param {string} fullPath 完整路径
    * @returns {string}
    */
@@ -736,21 +887,12 @@ class SessionHub {
   }
 
   /**
-   * 渲染消息预览条目
+   * 渲染消息预览条目（兼容旧方法）
    * @param {Object} msg 消息对象 { role, text, timestamp }
    * @returns {string} HTML 字符串
    */
   renderPreviewMessage(msg) {
-    const roleClass = msg.role === 'user' ? 'user' : 'assistant';
-    const roleLabel = msg.role === 'user' ? 'You' : 'AI';
-    const text = this.escapeHtml(msg.text || '');
-    
-    return `
-      <div class="preview-message ${roleClass}">
-        <span class="preview-role">${roleLabel}</span>
-        <span class="preview-text">${text}</span>
-      </div>
-    `;
+    return this.renderTerminalLine(msg);
   }
 
   /**
