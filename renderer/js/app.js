@@ -399,6 +399,11 @@ class BrowserControlManagerApp {
     // 检查 AI 状态
     await this.checkAIStatus();
     
+    // 默认面板是 chat，激活聊天面板背景
+    if (this.currentPanel === 'chat' && this.chatPanel) {
+      this.chatPanel.onPanelActivate();
+    }
+    
     // 加载工作目录设置
     await this.loadWorkspaceSettings();
     
@@ -1267,6 +1272,8 @@ class BrowserControlManagerApp {
    * 切换展示栏面板
    */
   switchPanel(panelId) {
+    const previousPanel = this.currentPanel;
+    
     // 移动版：对话面板和展示面板互斥全屏显示
     if (this.isMobileView()) {
       this.currentPanel = panelId;
@@ -1274,11 +1281,19 @@ class BrowserControlManagerApp {
       if (panelId === 'chat') {
         // 显示对话面板，隐藏展示面板
         this.updateMobilePanelVisibility(true);
+        // 激活聊天面板背景
+        if (this.chatPanel) {
+          this.chatPanel.onPanelActivate();
+        }
       } else {
         // 隐藏对话面板，显示展示面板
         this.activeDisplayContent = panelId;
         this.updateMobilePanelVisibility(false);
         this.showDisplayPanel(panelId);
+        // 取消激活聊天面板背景
+        if (previousPanel === 'chat' && this.chatPanel) {
+          this.chatPanel.onPanelDeactivate();
+        }
       }
       
       // 关闭可能打开的抽屉
@@ -1299,6 +1314,10 @@ class BrowserControlManagerApp {
           this.displayPanelExpanded = false;
           this.setDisplayPanelVisible(false);
         }
+        // 激活聊天面板背景
+        if (this.chatPanel) {
+          this.chatPanel.onPanelActivate();
+        }
         // 如果已在对话模式且展示区折叠，保持不变
       } else {
         // 其他模式：显示展示区
@@ -1307,6 +1326,10 @@ class BrowserControlManagerApp {
         this.displayPanelExpanded = true;
         this.setDisplayPanelVisible(true);
         this.showDisplayPanel(panelId);
+        // 取消激活聊天面板背景
+        if (previousPanel === 'chat' && this.chatPanel) {
+          this.chatPanel.onPanelDeactivate();
+        }
       }
     }
     

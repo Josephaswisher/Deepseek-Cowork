@@ -43,6 +43,9 @@ class ChatPanel {
     // 不展示的工具调用列表
     this.hiddenTools = ['mcp__happy__change_title'];
     
+    // Three.js 背景实例
+    this.chatBackground = null;
+    
     // DOM 元素
     this.elements = {};
   }
@@ -53,6 +56,110 @@ class ChatPanel {
   init() {
     this.bindElements();
     this.bindEvents();
+    
+    // 初始状态：如果没有消息，准备显示背景（但不启动动画，等待面板激活）
+    this._setInitialBackgroundState();
+  }
+
+  /**
+   * 设置初始背景状态
+   */
+  _setInitialBackgroundState() {
+    // 检查是否有消息
+    const hasMessages = this.renderedMessageIds.size > 0;
+    const hasWelcome = this.elements.aiMessages?.querySelector('.ai-welcome');
+    
+    // 如果只有欢迎消息或没有消息，准备显示背景
+    if (!hasMessages && hasWelcome) {
+      // 背景容器存在但先不添加 visible 类，等面板激活时再添加
+      if (this.elements.chatThreejsBg) {
+        this.elements.chatThreejsBg.style.display = 'block';
+      }
+    }
+  }
+
+  /**
+   * 面板激活时调用（由 app.js 在切换到聊天面板时调用）
+   */
+  onPanelActivate() {
+    // 首次激活时初始化 Three.js 背景
+    if (!this.chatBackground) {
+      this.initChatBackground();
+    }
+    
+    // 检查是否应该显示背景
+    const hasMessages = this.renderedMessageIds.size > 0;
+    const hasWelcome = this.elements.aiMessages?.querySelector('.ai-welcome');
+    
+    if (!hasMessages && hasWelcome) {
+      this.showChatBackground();
+    } else {
+      this.hideChatBackground();
+    }
+    
+    // 更新尺寸并启动动画（如果背景可见）
+    if (this.chatBackground && this.elements.chatThreejsBg?.classList.contains('visible')) {
+      this.chatBackground.onResize();
+      this.chatBackground.start();
+    }
+  }
+
+  /**
+   * 面板取消激活时调用
+   */
+  onPanelDeactivate() {
+    // 停止动画以节省资源
+    if (this.chatBackground) {
+      this.chatBackground.stop();
+    }
+  }
+
+  /**
+   * 初始化 Three.js 背景
+   */
+  initChatBackground() {
+    const container = this.elements.chatThreejsBg;
+    if (!container) {
+      console.warn('[ChatPanel] Chat background container not found');
+      return;
+    }
+    
+    if (typeof PreviewBackground !== 'undefined') {
+      this.chatBackground = new PreviewBackground({ container });
+      this.chatBackground.init();
+      console.log('[ChatPanel] Chat background initialized');
+    } else {
+      console.warn('[ChatPanel] PreviewBackground class not available');
+    }
+  }
+
+  /**
+   * 显示聊天背景
+   */
+  showChatBackground() {
+    if (this.elements.chatThreejsBg) {
+      this.elements.chatThreejsBg.classList.add('visible');
+      
+      // 如果背景已初始化，启动动画
+      if (this.chatBackground) {
+        this.chatBackground.onResize();
+        this.chatBackground.start();
+      }
+    }
+  }
+
+  /**
+   * 隐藏聊天背景
+   */
+  hideChatBackground() {
+    if (this.elements.chatThreejsBg) {
+      this.elements.chatThreejsBg.classList.remove('visible');
+      
+      // 停止动画以节省资源
+      if (this.chatBackground) {
+        this.chatBackground.stop();
+      }
+    }
   }
 
   /**
@@ -72,7 +179,9 @@ class ChatPanel {
       // 状态栏 - Agent 事件状态
       agentStatusItem: document.getElementById('agent-status'),
       happyEventDot: document.getElementById('happy-event-dot'),
-      happyEventText: document.getElementById('happy-event-text')
+      happyEventText: document.getElementById('happy-event-text'),
+      // Three.js 背景
+      chatThreejsBg: document.getElementById('chat-threejs-bg')
     };
   }
 
@@ -252,7 +361,11 @@ class ChatPanel {
     if (!container) return;
     
     // 如果已有欢迎信息，不重复添加
-    if (container.querySelector('.ai-welcome')) return;
+    if (container.querySelector('.ai-welcome')) {
+      // 但仍然显示背景
+      this.showChatBackground();
+      return;
+    }
     
     const t = typeof I18nManager !== 'undefined' ? I18nManager.t.bind(I18nManager) : (k) => k;
     
@@ -265,6 +378,9 @@ class ChatPanel {
     `;
     
     container.appendChild(welcomeDiv);
+    
+    // 显示 Three.js 背景
+    this.showChatBackground();
   }
 
   /**
@@ -506,6 +622,9 @@ class ChatPanel {
     if (isHistoryMessage) {
       const welcome = container.querySelector('.ai-welcome');
       if (welcome) welcome.remove();
+      
+      // 隐藏 Three.js 背景（有消息时不显示背景）
+      this.hideChatBackground();
     }
     
     switch (message.kind) {

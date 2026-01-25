@@ -718,3 +718,60 @@ pre:hover .code-copy-btn {
   transform: translateX(2px);
   opacity: 0.8;
 }
+
+/* ===== 聊天面板 Three.js 动态背景 ===== */
+/* 仅在没有消息时显示，提供视觉吸引力 */
+
+.chat-threejs-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  background: #000;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.chat-threejs-bg.visible {
+  opacity: 1;
+}
+
+.chat-threejs-bg canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 确保聊天面板是相对定位的容器 */
+#chat-panel {
+  position: relative;
+}
+
+/* 欢迎信息在 three.js 背景上方 */
+.ai-welcome {
+  position: relative;
+  z-index: 1;
+}
+
+/* 消息容器在背景上方 */
+#ai-chat-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* 当有 three.js 背景时，欢迎信息略微调整样式使其更突出 */
+.chat-threejs-bg.visible ~ #ai-chat-container .ai-welcome {
+  background: transparent;
+}
+
+.chat-threejs-bg.visible ~ #ai-chat-container .ai-welcome h3 {
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+}
+
+.chat-threejs-bg.visible ~ #ai-chat-container .ai-welcome p {
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+}
