@@ -289,7 +289,8 @@ class MobileDrawer {
             if (isDir) {
               this.app.loadFiles(path);
             } else {
-              this.app.previewFile(path);
+              // 使用正确的方法打开文件预览
+              this.app.openFilePreview(path);
             }
             this.hide();
           }
