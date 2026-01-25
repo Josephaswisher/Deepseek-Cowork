@@ -601,3 +601,16 @@
   color: var(--muted-foreground);
   word-break: break-all;
 }
+
+/* ===== 对话全宽模式 ===== */
+#main-container.chat-fullwidth #chat-panel {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  border-right: none;
+}
+
+#main-container.chat-fullwidth #display-panel {
+  display: none;
+}

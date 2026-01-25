@@ -69,6 +69,7 @@
     
     // 侧边栏导航
     sidebar: {
+      chat: '对话',
       files: '文件',
       browser: '浏览器',
       settings: '设置',

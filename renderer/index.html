@@ -106,11 +106,15 @@
     </header>
     
     <!-- 主容器：导航栏 + 对话框 + 展示栏 -->
-    <div id="main-container">
+    <div id="main-container" class="chat-fullwidth">
       <!-- Left sidebar navigation -->
       <nav id="sidebar">
         <div class="nav-section">
-          <button class="nav-btn active" data-panel="files" data-i18n-title="sidebar.fileManagement" title="File Management">
+          <button class="nav-btn active" data-panel="chat" data-i18n-title="sidebar.chat" title="Chat">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></span>
+            <span class="nav-label" data-i18n="sidebar.chat">Chat</span>
+          </button>
+          <button class="nav-btn" data-panel="files" data-i18n-title="sidebar.fileManagement" title="File Management">
             <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
             <span class="nav-label" data-i18n="sidebar.files">Files</span>
           </button>

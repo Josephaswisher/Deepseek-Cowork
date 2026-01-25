@@ -104,8 +104,14 @@ class BrowserControlManagerApp {
     // FilesPanel 实例
     this.filesPanel = new FilesPanel(this);
     
-    // 当前面板（默认文件面板）
-    this.currentPanel = 'files';
+    // 当前面板（默认对话模式）
+    this.currentPanel = 'chat';
+    
+    // 对话模式下展示区是否展开
+    this.displayPanelExpanded = false;
+    
+    // 展示区显示的内容（默认文件）
+    this.activeDisplayContent = 'files';
     
     // 当前设置分区（默认环境分区）
     this.currentSettingsSection = 'environment';
@@ -1231,17 +1237,69 @@ class BrowserControlManagerApp {
    * 切换展示栏面板
    */
   switchPanel(panelId) {
-    // 更新导航按钮状态
-    this.navButtons.forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-panel') === panelId);
-    });
+    if (panelId === 'chat') {
+      // 对话模式
+      if (this.currentPanel === 'chat' && this.displayPanelExpanded) {
+        // 已在对话模式且展示区展开，则折叠
+        this.displayPanelExpanded = false;
+        this.setDisplayPanelVisible(false);
+      } else if (this.currentPanel !== 'chat') {
+        // 从其他模式切换到对话模式
+        this.currentPanel = 'chat';
+        this.displayPanelExpanded = false;
+        this.setDisplayPanelVisible(false);
+      }
+      // 如果已在对话模式且展示区折叠，保持不变
+    } else {
+      // 其他模式：显示展示区
+      this.currentPanel = panelId;
+      this.activeDisplayContent = panelId;
+      this.displayPanelExpanded = true;
+      this.setDisplayPanelVisible(true);
+      this.showDisplayPanel(panelId);
+    }
     
-    // 只切换展示栏内的面板
+    this.updateNavButtons();
+  }
+  
+  /**
+   * 设置展示区可见性
+   * @param {boolean} visible 是否可见
+   */
+  setDisplayPanelVisible(visible) {
+    const mainContainer = document.getElementById('main-container');
+    const displayPanel = document.getElementById('display-panel');
+    
+    if (visible) {
+      mainContainer?.classList.remove('chat-fullwidth');
+      if (displayPanel) displayPanel.style.display = '';
+    } else {
+      mainContainer?.classList.add('chat-fullwidth');
+      if (displayPanel) displayPanel.style.display = 'none';
+    }
+  }
+  
+  /**
+   * 展开展示区（保持对话模式）
+   * 供 SessionHub 等外部调用
+   */
+  expandDisplayPanel() {
+    if (this.currentPanel === 'chat' && !this.displayPanelExpanded) {
+      this.displayPanelExpanded = true;
+      this.setDisplayPanelVisible(true);
+      this.showDisplayPanel(this.activeDisplayContent);
+    }
+  }
+  
+  /**
+   * 显示指定的展示面板内容
+   * @param {string} panelId 面板 ID (files, browser, settings)
+   */
+  showDisplayPanel(panelId) {
+    // 切换展示栏内的面板
     this.panels.forEach(panel => {
       panel.classList.toggle('active', panel.id === `panel-${panelId}`);
     });
-    
-    this.currentPanel = panelId;
 
     // 特定面板的初始化
     if (panelId === 'settings') {
@@ -1270,6 +1328,15 @@ class BrowserControlManagerApp {
       // 然后尝试刷新数据
       this.refreshTabs(isFirstSwitch);
     }
+  }
+  
+  /**
+   * 更新导航按钮状态
+   */
+  updateNavButtons() {
+    this.navButtons.forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-panel') === this.currentPanel);
+    });
   }
 
   /**

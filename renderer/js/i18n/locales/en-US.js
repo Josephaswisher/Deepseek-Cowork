@@ -69,6 +69,7 @@
     
     // Sidebar navigation
     sidebar: {
+      chat: 'Chat',
       files: 'Files',
       browser: 'Browser',
       settings: 'Settings',
