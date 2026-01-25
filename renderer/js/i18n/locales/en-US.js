@@ -81,8 +81,10 @@
     sessionHub: {
       title: 'Session Hub',
       switchDir: 'Switch to new directory',
+      switchTo: 'Switch',
       currentSession: 'Current',
       noSessions: 'No other active sessions',
+      noMessages: 'No messages yet',
       loading: 'Loading...',
       status: {
         idle: 'Idle',

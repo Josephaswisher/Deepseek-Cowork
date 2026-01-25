@@ -81,8 +81,10 @@
     sessionHub: {
       title: '会话中心',
       switchDir: '切换到新工作目录',
+      switchTo: '切换',
       currentSession: '当前会话',
       noSessions: '暂无其他活动会话',
+      noMessages: '暂无消息',
       loading: '加载中...',
       status: {
         idle: '空闲',

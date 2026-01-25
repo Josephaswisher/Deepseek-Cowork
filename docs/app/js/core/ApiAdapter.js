@@ -73,6 +73,7 @@ const API_MAPPING = {
     'denyPermission': { method: 'POST', path: '/api/ai/permission/deny' },
     'abortSession': { method: 'POST', path: '/api/ai/abort' },
     'getAllSessions': { method: 'GET', path: '/api/ai/sessions' },
+    'getMultiSessionMessages': { method: 'POST', path: '/api/ai/sessions/messages' },
     'getSessionId': { method: 'GET', path: '/api/ai/session/{name}' },
     'reconnectSession': { method: 'POST', path: '/api/ai/session/reconnect' },
     

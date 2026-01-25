@@ -20,6 +20,10 @@ class SessionHub {
     this.sessions = [];
     this.currentSessionId = null;
     
+    // 看板消息缓存 { sessionId: [{ role, text, timestamp }, ...] }
+    this.sessionMessages = {};
+    this.maxMessagesPerSession = 5;
+    
     // DOM 元素
     this.elements = {};
     
@@ -28,6 +32,7 @@ class SessionHub {
     this.show = this.show.bind(this);
     this.hide = this.hide.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleMessageAdded = this.handleMessageAdded.bind(this);
   }
 
   /**
@@ -37,6 +42,7 @@ class SessionHub {
     this.bindElements();
     this.bindEvents();
     this.subscribeToStateUpdates();
+    this.subscribeToMessageUpdates();
     this.preloadSessionState();
     console.log('[SessionHub] Initialized');
   }
@@ -56,6 +62,9 @@ class SessionHub {
           this.handleStateUpdated(state);
           this.isStateReady = true;
           console.log('[SessionHub] State preloaded (Electron):', state.sessions.length, 'sessions');
+          
+          // 预加载消息（看板用）
+          await this.preloadSessionMessages(state.sessions);
         }
       }
       // Web 版本：依赖 WebSocket 连接时推送，无需额外操作
@@ -63,6 +72,48 @@ class SessionHub {
     } catch (error) {
       console.warn('[SessionHub] Preload failed:', error.message);
       // 预加载失败不影响后续操作，用户打开面板时会重新加载
+    }
+  }
+
+  /**
+   * 预加载各 session 的消息（看板用）
+   * @param {Array} sessions session 列表
+   */
+  async preloadSessionMessages(sessions) {
+    if (!sessions || sessions.length === 0) return;
+    
+    try {
+      // 提取所有 session ID
+      const sessionIds = sessions.map(s => s.sessionId).filter(Boolean);
+      if (sessionIds.length === 0) return;
+      
+      let messagesData = null;
+      
+      if (window.browserControlManager?.getMultiSessionMessages) {
+        // Electron 版本
+        messagesData = await window.browserControlManager.getMultiSessionMessages(sessionIds, this.maxMessagesPerSession);
+      } else if (window.apiAdapter?.request) {
+        // Web 版本
+        const response = await window.apiAdapter.request('getMultiSessionMessages', {
+          sessionIds,
+          limit: this.maxMessagesPerSession
+        });
+        if (response?.success) {
+          messagesData = response.messages;
+        }
+      }
+      
+      if (messagesData) {
+        // 缓存消息
+        for (const [sessionId, data] of Object.entries(messagesData)) {
+          if (data?.messages) {
+            this.sessionMessages[sessionId] = data.messages;
+          }
+        }
+        console.log('[SessionHub] Messages preloaded for', Object.keys(messagesData).length, 'sessions');
+      }
+    } catch (error) {
+      console.warn('[SessionHub] Preload messages failed:', error.message);
     }
   }
 
@@ -82,6 +133,73 @@ class SessionHub {
       // Web 版本：通过 WebSocket 监听
       window.apiAdapter.on('session:stateUpdated', this.handleStateUpdated);
       console.log('[SessionHub] Subscribed to state updates (Web)');
+    }
+  }
+
+  /**
+   * 订阅消息添加事件（看板实时更新）
+   * 兼容 Electron 和 Web 版本
+   */
+  subscribeToMessageUpdates() {
+    if (window.browserControlManager?.onMessageAdded) {
+      // Electron 版本：通过 IPC 监听
+      this._unsubscribeMessage = window.browserControlManager.onMessageAdded(this.handleMessageAdded);
+      console.log('[SessionHub] Subscribed to message updates (Electron)');
+    } else if (window.apiAdapter?.on) {
+      // Web 版本：通过 WebSocket 监听
+      window.apiAdapter.on('message:added', this.handleMessageAdded);
+      console.log('[SessionHub] Subscribed to message updates (Web)');
+    }
+  }
+
+  /**
+   * 处理消息添加事件
+   * @param {Object} data { sessionId, message: { role, text, timestamp } }
+   */
+  handleMessageAdded(data) {
+    if (!data?.sessionId || !data?.message) return;
+    
+    const { sessionId, message } = data;
+    
+    // 初始化该 session 的消息数组
+    if (!this.sessionMessages[sessionId]) {
+      this.sessionMessages[sessionId] = [];
+    }
+    
+    // 追加消息
+    this.sessionMessages[sessionId].push(message);
+    
+    // 限制消息数量
+    if (this.sessionMessages[sessionId].length > this.maxMessagesPerSession) {
+      this.sessionMessages[sessionId] = this.sessionMessages[sessionId].slice(-this.maxMessagesPerSession);
+    }
+    
+    // 如果面板可见，增量更新对应卡片的消息区
+    if (this.isVisible) {
+      this.updateCardMessages(sessionId);
+    }
+  }
+
+  /**
+   * 增量更新指定卡片的消息区
+   * @param {string} sessionId session ID
+   */
+  updateCardMessages(sessionId) {
+    const card = this.elements.list?.querySelector(`.session-card[data-session-id="${sessionId}"]`);
+    if (!card) return;
+    
+    const previewArea = card.querySelector('.message-preview');
+    if (!previewArea) return;
+    
+    const messages = this.sessionMessages[sessionId] || [];
+    const t = this.getTranslator();
+    
+    if (messages.length === 0) {
+      previewArea.innerHTML = `<p class="no-messages">${t('sessionHub.noMessages')}</p>`;
+    } else {
+      previewArea.innerHTML = messages.map(msg => this.renderPreviewMessage(msg)).join('');
+      // 滚动到底部
+      previewArea.scrollTop = previewArea.scrollHeight;
     }
   }
 
@@ -350,7 +468,7 @@ class SessionHub {
   }
 
   /**
-   * 渲染单个 session 卡片
+   * 渲染单个 session 卡片（看板模式）
    * @param {Object} session session 数据
    * @param {Function} t 翻译函数
    * @returns {string} HTML 字符串
@@ -368,39 +486,53 @@ class SessionHub {
     // 格式化路径显示（截取最后两级目录）
     const displayPath = this.formatPath(session.workspaceDir || session.name || 'Unknown');
     
+    // 获取该 session 的消息预览
+    const messages = this.sessionMessages[session.sessionId] || [];
+    const messagesHtml = messages.length > 0 
+      ? messages.map(msg => this.renderPreviewMessage(msg)).join('')
+      : `<p class="no-messages">${t('sessionHub.noMessages')}</p>`;
+    
     return `
       <div class="session-card ${isCurrent ? 'current' : ''}" 
            data-session-id="${this.escapeHtml(session.sessionId || '')}"
            data-workspace-dir="${this.escapeHtml(session.workspaceDir || '')}">
         <div class="session-card-header">
-          <span class="session-card-path" title="${this.escapeHtml(session.workspaceDir || '')}">${this.escapeHtml(displayPath)}</span>
-          <div class="session-card-status">
-            <span class="session-card-status-dot ${statusClass}"></span>
-            <span class="session-card-status-text">${this.escapeHtml(statusText)}</span>
+          <div class="session-card-title">
+            <span class="session-card-path" title="${this.escapeHtml(session.workspaceDir || '')}">${this.escapeHtml(displayPath)}</span>
+            <div class="session-card-status">
+              <span class="session-card-status-dot ${statusClass}"></span>
+              <span class="session-card-status-text">${this.escapeHtml(statusText)}</span>
+            </div>
+          </div>
+          <div class="session-card-actions">
+            ${isCurrent 
+              ? `<span class="session-card-badge">${t('sessionHub.currentSession')}</span>` 
+              : `<button class="switch-btn" title="${t('sessionHub.switchTo')}">${t('sessionHub.switchTo')}</button>`
+            }
           </div>
         </div>
-        <div class="session-card-body">
-          <span class="session-card-info">${this.formatSessionInfo(session)}</span>
-          ${isCurrent ? `<span class="session-card-badge">${t('sessionHub.currentSession')}</span>` : ''}
+        <div class="message-preview">
+          ${messagesHtml}
         </div>
       </div>
     `;
   }
 
   /**
-   * 绑定卡片点击事件
+   * 绑定卡片事件（切换按钮）
    */
   bindCardEvents() {
-    const cards = this.elements.list?.querySelectorAll('.session-card');
-    cards?.forEach(card => {
-      card.addEventListener('click', () => {
+    // 绑定切换按钮点击事件
+    const switchBtns = this.elements.list?.querySelectorAll('.switch-btn');
+    switchBtns?.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        
+        const card = btn.closest('.session-card');
+        if (!card) return;
+        
         const sessionId = card.dataset.sessionId;
         const workspaceDir = card.dataset.workspaceDir;
-        
-        // 如果是当前 session，不做任何操作
-        if (card.classList.contains('current')) {
-          return;
-        }
         
         this.switchToSession(sessionId, workspaceDir);
       });
@@ -604,6 +736,24 @@ class SessionHub {
   }
 
   /**
+   * 渲染消息预览条目
+   * @param {Object} msg 消息对象 { role, text, timestamp }
+   * @returns {string} HTML 字符串
+   */
+  renderPreviewMessage(msg) {
+    const roleClass = msg.role === 'user' ? 'user' : 'assistant';
+    const roleLabel = msg.role === 'user' ? 'You' : 'AI';
+    const text = this.escapeHtml(msg.text || '');
+    
+    return `
+      <div class="preview-message ${roleClass}">
+        <span class="preview-role">${roleLabel}</span>
+        <span class="preview-text">${text}</span>
+      </div>
+    `;
+  }
+
+  /**
    * 获取翻译函数
    * @returns {Function}
    */
@@ -635,8 +785,15 @@ class SessionHub {
       this._unsubscribeState = null;
     }
     
+    // 取消订阅消息更新事件
+    if (this._unsubscribeMessage) {
+      this._unsubscribeMessage();
+      this._unsubscribeMessage = null;
+    }
+    
     this.elements = {};
     this.sessions = [];
+    this.sessionMessages = {};
   }
 }
 

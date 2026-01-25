@@ -1427,16 +1427,13 @@ class ExplorerModule {
     }
 
     if (this.filePreviewPath) {
-      // 检测运行环境：优先检查 apiAdapter 是否存在且连接（更可靠）
-      const hasApiAdapter = window.apiAdapter && typeof window.apiAdapter.isConnected === 'function';
-      const isWebMode = hasApiAdapter || 
-                        (typeof window.browserControlManager?._isPolyfill === 'boolean' && 
-                         window.browserControlManager._isPolyfill === true);
+      // 检测运行环境：仅通过 _isPolyfill 标记判断是否为 Web 模式
+      // 注意：window.apiAdapter 在 Electron 和 Web 模式下都会存在，不能用于判断
+      const isWebMode = window.browserControlManager?._isPolyfill === true;
       
       console.log('[ExplorerModule] renderHtmlPreview:', {
         filePath: this.filePreviewPath,
         isWebMode,
-        hasApiAdapter,
         baseUrl: window.apiAdapter?._baseUrl
       });
       

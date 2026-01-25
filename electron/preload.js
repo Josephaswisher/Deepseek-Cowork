@@ -971,10 +971,29 @@ contextBridge.exposeInMainWorld('browserControlManager', {
   },
 
   /**
+   * 监听消息添加事件（供看板实时更新）
+   * @param {Function} callback - 回调函数 ({ sessionId, message: { role, text, timestamp } })
+   * @returns {Function} 取消监听函数
+   */
+  onMessageAdded: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('message:added', handler);
+    return () => ipcRenderer.removeListener('message:added', handler);
+  },
+
+  /**
    * 获取格式化后的 Session 状态（供 SessionHub 预加载使用）
    * @returns {Promise<Object>} { currentSession, sessions: [], updatedAt }
    */
   getFormattedSessionState: () => ipcRenderer.invoke('happy:getFormattedSessionState'),
+
+  /**
+   * 批量获取多个 session 的消息（供看板预览使用）
+   * @param {string[]} sessionIds Session ID 列表
+   * @param {number} limit 每个 session 返回的消息数量（默认 5）
+   * @returns {Promise<Object>} { [sessionId]: { messages: [...], lastUpdated } }
+   */
+  getMultiSessionMessages: (sessionIds, limit) => ipcRenderer.invoke('happy:getMultiSessionMessages', sessionIds, limit),
 
   // ============ 窗口控制 ============
   

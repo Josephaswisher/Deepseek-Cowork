@@ -570,6 +570,11 @@ function setupIpcHandlers() {
     return HappyService.getFormattedSessionState();
   });
 
+  // 批量获取多个 session 的消息（供看板预览使用）
+  ipcMain.handle('happy:getMultiSessionMessages', (event, sessionIds, limit) => {
+    return HappyService.getMultiSessionMessages(sessionIds, limit);
+  });
+
   ipcMain.handle('happy:isDaemonRunning', async () => {
     return await HappyService.isDaemonRunning();
   });
@@ -2168,7 +2173,9 @@ function setupHappyServiceEventForwarding() {
     'daemon:statusChanged',
     'daemon:startProgress',
     // session 状态更新事件（由 SessionManager 触发，HappyService 转发）
-    'session:stateUpdated'
+    'session:stateUpdated',
+    // 消息添加事件（供看板实时更新）
+    'message:added'
   ];
   
   happyEvents.forEach(eventName => {
