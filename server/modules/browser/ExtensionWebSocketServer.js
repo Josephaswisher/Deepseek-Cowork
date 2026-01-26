@@ -25,6 +25,7 @@ class ExtensionWebSocketServer {
         this.activeConnections = new Map();
         this.pendingResponses = new Map();
         this.isShuttingDown = false;  // 关闭标志，防止关闭过程中写入数据库
+        this.securityConfig = null;   // 安全配置
     }
 
     /**
@@ -49,6 +50,91 @@ class ExtensionWebSocketServer {
      */
     setEventEmitter(eventEmitter) {
         this.eventEmitter = eventEmitter;
+    }
+
+    /**
+     * 设置安全配置
+     * @param {Object} securityConfig 安全配置对象
+     */
+    setSecurityConfig(securityConfig) {
+        this.securityConfig = securityConfig;
+        Logger.info('Security config set for WebSocket server');
+    }
+
+    /**
+     * 验证 Origin 是否在白名单中
+     * @param {string} origin - 请求的 Origin
+     * @returns {boolean} - 是否允许
+     */
+    validateOrigin(origin) {
+        const config = this.securityConfig || {};
+        
+        // 如果未启用严格检查，允许所有连接
+        if (config.strictOriginCheck === false) {
+            return true;
+        }
+        
+        const allowedOrigins = config.allowedOrigins || [
+            'moz-extension://*',
+            'chrome-extension://*',
+            'http://localhost:*',
+            'http://127.0.0.1:*',
+            'https://localhost:*',
+            'https://127.0.0.1:*'
+        ];
+        
+        // 处理空 Origin（非浏览器客户端，如 Node.js 脚本）
+        if (!origin || origin === 'null' || origin === 'undefined') {
+            const allowNull = config.allowNullOrigin !== false;
+            if (allowNull) {
+                Logger.debug(`Allowing null/undefined origin (non-browser client)`);
+            }
+            return allowNull;
+        }
+        
+        // 检查白名单
+        const isAllowed = allowedOrigins.some(pattern => {
+            if (pattern.includes('*')) {
+                // 将通配符模式转换为正则表达式
+                // 需要转义特殊字符，然后将 * 替换为 .*
+                const escapedPattern = pattern
+                    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')  // 转义特殊字符（除了 *）
+                    .replace(/\*/g, '.*');  // 将 * 替换为 .*
+                const regex = new RegExp('^' + escapedPattern + '$');
+                return regex.test(origin);
+            }
+            return origin === pattern;
+        });
+        
+        if (isAllowed) {
+            Logger.debug(`Origin validated: ${origin}`);
+        }
+        
+        return isAllowed;
+    }
+
+    /**
+     * 记录被拒绝的连接
+     * @param {Object} request - HTTP 请求对象
+     * @param {string} reason - 拒绝原因
+     */
+    logRejectedConnection(request, reason) {
+        const config = this.securityConfig?.securityLogging || {};
+        
+        if (config.logRejectedConnections === false) {
+            return;
+        }
+        
+        const clientAddress = `${request.socket.remoteAddress}:${request.socket.remotePort}`;
+        const origin = request.headers.origin || 'null';
+        const userAgent = request.headers['user-agent'] || 'unknown';
+        const timestamp = new Date().toISOString();
+        
+        Logger.warn(`[SECURITY] WebSocket connection rejected: ${reason}`);
+        Logger.warn(`  - Timestamp: ${timestamp}`);
+        Logger.warn(`  - Origin: ${origin}`);
+        Logger.warn(`  - Client Address: ${clientAddress}`);
+        Logger.warn(`  - User-Agent: ${userAgent}`);
     }
 
     /**
@@ -81,6 +167,14 @@ class ExtensionWebSocketServer {
      */
     async handleConnection(socket, request) {
         try {
+            // 安全检查：验证 Origin
+            const origin = request.headers.origin;
+            if (!this.validateOrigin(origin)) {
+                this.logRejectedConnection(request, 'Origin not allowed');
+                socket.close(1008, 'Origin not allowed');
+                return;
+            }
+            
             await this.cleanupDisconnectedClients();
 
             // 检查连接类型 - 通过URL参数或header区分

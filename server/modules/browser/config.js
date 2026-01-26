@@ -71,11 +71,29 @@ class BrowserControlServerConfig {
       // 安全配置
       security: {
         enableCors: true,
-        corsOrigins: ['*'],
+        corsOrigins: ['*'],  // 已弃用，使用 allowedOrigins 替代
         maxRequestSize: '100mb',
         enableRateLimit: false,
         rateLimitWindow: 60000,
-        rateLimitMax: 100
+        rateLimitMax: 100,
+        
+        // Origin 白名单配置（用于 WebSocket 和 HTTP CORS）
+        allowedOrigins: [
+          'moz-extension://*',      // Firefox 扩展
+          'chrome-extension://*',   // Chrome 扩展
+          'http://localhost:*',     // 本地开发
+          'http://127.0.0.1:*',     // 本地开发
+          'https://localhost:*',    // 本地 HTTPS
+          'https://127.0.0.1:*'     // 本地 HTTPS
+        ],
+        allowNullOrigin: true,      // 允许无 Origin 的请求（Node.js 脚本、服务器端调用等）
+        strictOriginCheck: true,    // 是否启用严格 Origin 检查
+        
+        // 安全日志配置
+        securityLogging: {
+          logRejectedConnections: true,  // 是否记录被拒绝的连接
+          logLevel: 'WARN'               // 安全日志级别
+        }
       },
 
       // 日志配置

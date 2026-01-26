@@ -90,6 +90,8 @@ function setupBrowserControlService(options = {}) {
           this.extensionWebSocketServer.setTabsManager(this.tabsManager);
           this.extensionWebSocketServer.setCallbackManager(this.callbackManager);
           this.extensionWebSocketServer.setEventEmitter(this);
+          // 设置安全配置（用于 Origin 验证）
+          this.extensionWebSocketServer.setSecurityConfig(this.config.security);
         }
 
         // Cookie管理改为完全手动模式
@@ -210,6 +212,47 @@ function setupBrowserControlService(options = {}) {
     }
     
     /**
+     * 验证 Origin 是否在白名单中（用于 CORS）
+     * @param {string} origin - 请求的 Origin
+     * @returns {boolean} - 是否允许
+     */
+    validateOrigin(origin) {
+      const securityConfig = this.config?.security || {};
+      
+      // 如果未启用严格检查，允许所有请求
+      if (securityConfig.strictOriginCheck === false) {
+        return true;
+      }
+      
+      const allowedOrigins = securityConfig.allowedOrigins || [
+        'moz-extension://*',
+        'chrome-extension://*',
+        'http://localhost:*',
+        'http://127.0.0.1:*',
+        'https://localhost:*',
+        'https://127.0.0.1:*'
+      ];
+      
+      // 处理空 Origin（同源请求或非浏览器客户端）
+      if (!origin || origin === 'null' || origin === 'undefined') {
+        return securityConfig.allowNullOrigin !== false;
+      }
+      
+      // 检查白名单
+      return allowedOrigins.some(pattern => {
+        if (pattern.includes('*')) {
+          // 将通配符模式转换为正则表达式
+          const escapedPattern = pattern
+            .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*');
+          const regex = new RegExp('^' + escapedPattern + '$');
+          return regex.test(origin);
+        }
+        return origin === pattern;
+      });
+    }
+
+    /**
      * 设置路由
      * @param {Object} app Express 应用实例
      */
@@ -226,11 +269,21 @@ function setupBrowserControlService(options = {}) {
       // API路由前缀
       const apiRouter = express.Router();
       
-      // 启用 CORS
+      // 启用 CORS（使用白名单验证）
+      const self = this;
       apiRouter.use(cors({
-        origin: '*',
+        origin: function(requestOrigin, callback) {
+          // 验证 Origin 是否在白名单中
+          if (self.validateOrigin(requestOrigin)) {
+            callback(null, true);
+          } else {
+            Logger.warn(`[SECURITY] CORS rejected request from origin: ${requestOrigin || 'null'}`);
+            callback(new Error('Origin not allowed by CORS policy'));
+          }
+        },
         methods: ['GET', 'POST', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Accept']
+        allowedHeaders: ['Content-Type', 'Accept'],
+        credentials: false  // 不允许凭证，与 origin 动态验证配合使用
       }));
       
       app.use('/api/browser', apiRouter);
