@@ -942,55 +942,47 @@ class BrowserControlManagerApp {
       
       this.wsClient = new WebSocketClient({ url: wsUrl });
       
-      // 设置事件转发到 apiAdapter
+      // 注册事件监听器用于调试日志
+      // 注意：WebSocketClient._emit() 会自动转发事件到 apiAdapter，
+      // 这里仅用于日志输出，不要再手动转发，否则会导致消息重复
       this.wsClient.on('happy:message', (data) => {
         console.log('[App] WS happy:message', data);
-        window.apiAdapter?.emit?.('happy:message', data);
       });
       
       this.wsClient.on('happy:connected', (data) => {
         console.log('[App] WS happy:connected', data);
-        window.apiAdapter?.emit?.('happy:connected', data);
       });
       
       this.wsClient.on('happy:disconnected', (data) => {
         console.log('[App] WS happy:disconnected', data);
-        window.apiAdapter?.emit?.('happy:disconnected', data);
       });
       
       this.wsClient.on('happy:eventStatus', (data) => {
         console.log('[App] WS happy:eventStatus', data);
-        window.apiAdapter?.emit?.('happy:eventStatus', data);
       });
       
       this.wsClient.on('happy:error', (data) => {
         console.log('[App] WS happy:error', data);
-        window.apiAdapter?.emit?.('happy:error', data);
       });
       
       this.wsClient.on('happy:usage', (data) => {
         console.log('[App] WS happy:usage', data);
-        window.apiAdapter?.emit?.('happy:usage', data);
       });
       
       this.wsClient.on('happy:messagesRestored', (data) => {
         console.log('[App] WS happy:messagesRestored', data);
-        window.apiAdapter?.emit?.('happy:messagesRestored', data);
       });
       
       this.wsClient.on('daemon:statusChanged', (data) => {
         console.log('[App] WS daemon:statusChanged', data);
-        window.apiAdapter?.emit?.('daemon:statusChanged', data);
       });
       
       this.wsClient.on('happy:initialized', (data) => {
         console.log('[App] WS happy:initialized', data);
-        window.apiAdapter?.emit?.('happy:initialized', data);
       });
       
       this.wsClient.on('happy:status', (data) => {
         console.log('[App] WS happy:status', data);
-        window.apiAdapter?.emit?.('happy:status', data);
       });
       
       // 连接 WebSocket
@@ -1032,9 +1024,10 @@ class BrowserControlManagerApp {
       this.updateAIStatus({ isConnected: true });
       
       // 连接成功后加载历史消息
+      // 注意：先设置标志再 await，防止竞态条件（happy:status 事件可能同时触发）
       if (!this._historyLoaded) {
-        await this.loadHappyMessageHistory();
         this._historyLoaded = true;
+        await this.loadHappyMessageHistory();
       }
       
       // 加载最新的 usage 数据
@@ -1147,10 +1140,11 @@ class BrowserControlManagerApp {
         });
         
         // 如果已连接，加载历史消息并显示连接提示
+        // 注意：先设置标志再 await，防止竞态条件（happy:connected 事件可能同时触发）
         if (data.clientConnected) {
           if (!this._historyLoaded) {
-            await this.loadHappyMessageHistory();
             this._historyLoaded = true;
+            await this.loadHappyMessageHistory();
           }
           await this.loadLatestUsage();
           

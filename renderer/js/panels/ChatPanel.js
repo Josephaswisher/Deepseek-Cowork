@@ -422,9 +422,10 @@ class ChatPanel {
         // 如果已连接，加载历史消息（如果尚未加载）
         if (status.isConnected) {
           // 检查是否已经通过 WebSocket 事件加载了历史（避免重复加载清空消息）
+          // 注意：先设置标志再 await，防止竞态条件
           if (!this.app?._historyLoaded) {
-            await this.loadHappyMessageHistory();
             if (this.app) this.app._historyLoaded = true;
+            await this.loadHappyMessageHistory();
           }
         } else {
           // 如果未连接，自动尝试连接
