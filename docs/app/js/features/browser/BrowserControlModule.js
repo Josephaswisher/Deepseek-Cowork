@@ -345,29 +345,30 @@ class BrowserControlModule {
    * @returns {Promise<Object>} 密钥信息
    */
   async fetchAuthSecret() {
+    console.log('[BrowserControlModule] fetchAuthSecret called');
     try {
-      // 优先使用 apiAdapter
-      if (window.apiAdapter && window.apiAdapter.isConnected()) {
-        const result = await window.apiAdapter.call('getAuthSecret');
-        if (result && result.success) {
-          this._authSecret = result.secretKey;
-          this.updateAuthDisplay(result);
-          return result;
-        }
-      }
+      // 始终使用 HTTP 请求获取认证密钥（因为 Electron IPC 没有暴露此方法）
+      // 构建完整的 URL - 在 Electron 中需要使用完整 URL
+      const baseUrl = window.apiAdapter?._baseUrl || 'http://localhost:3333';
+      const url = `${baseUrl}/api/browser/auth/secret`;
       
-      // 回退到直接 fetch
-      const response = await fetch('/api/browser/auth/secret');
+      console.log('[BrowserControlModule] Fetching auth secret from:', url);
+      const response = await fetch(url);
+      console.log('[BrowserControlModule] fetch response status:', response.status);
+      
       if (response.ok) {
         const result = await response.json();
+        console.log('[BrowserControlModule] fetch result:', result);
         if (result.success) {
           this._authSecret = result.secretKey;
+          console.log('[BrowserControlModule] Auth secret set:', this._authSecret ? 'yes (length: ' + this._authSecret.length + ')' : 'no');
           this.updateAuthDisplay(result);
           return result;
         }
       }
       
       // 请求失败
+      console.warn('[BrowserControlModule] Failed to get auth secret, response not ok');
       this.updateAuthDisplay({ authEnabled: false });
       return null;
     } catch (error) {
@@ -419,9 +420,16 @@ class BrowserControlModule {
   /**
    * 切换密钥显示/隐藏
    */
-  toggleSecretVisibility() {
+  async toggleSecretVisibility() {
+    // 如果没有密钥，先尝试获取
     if (!this._authSecret) {
-      return;
+      console.log('[BrowserControlModule] No auth secret cached, fetching...');
+      await this.fetchAuthSecret();
+      // 如果获取后仍然没有密钥，则返回
+      if (!this._authSecret) {
+        console.warn('[BrowserControlModule] Failed to fetch auth secret, cannot toggle visibility');
+        return;
+      }
     }
     
     this._secretVisible = !this._secretVisible;

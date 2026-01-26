@@ -1121,10 +1121,39 @@ class ExtensionWebSocketServer {
      */
     async handleMessage(message, clientId, sessionId = null) {
         try {
-            const data = JSON.parse(message);
+            let data = JSON.parse(message);
             
-            // 验证会话（如果启用认证）
-            if (this.isAuthEnabled() && sessionId) {
+            // 支持新协议格式：type: 'request' 包装的消息
+            // 解包后按原有逻辑处理
+            if (data.type === 'request') {
+                const messageSessionId = data.sessionId || sessionId;
+                
+                // 验证会话（如果启用认证）
+                if (this.isAuthEnabled()) {
+                    const session = this.validateRequestSession(messageSessionId);
+                    if (!session) {
+                        Logger.warn(`[Auth] Invalid session for extension request from ${clientId}`);
+                        return;
+                    }
+                }
+                
+                // 解包消息：将 action 作为 type，payload 作为主体
+                const action = data.action;
+                const payload = data.payload || {};
+                const requestId = data.requestId || payload.requestId;
+                
+                // 重构消息为旧格式以便后续处理
+                data = {
+                    type: action,
+                    requestId: requestId,
+                    ...payload
+                };
+                
+                Logger.debug(`[Extension] Unwrapped request: action=${action}, requestId=${requestId}`);
+            }
+            
+            // 验证会话（如果启用认证，针对非 request 格式的消息）
+            if (this.isAuthEnabled() && sessionId && data.type !== 'request') {
                 const session = this.validateRequestSession(sessionId);
                 if (!session) {
                     Logger.warn(`[Auth] Invalid session for extension message from ${clientId}`);
