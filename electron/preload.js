@@ -971,6 +971,18 @@ contextBridge.exposeInMainWorld('browserControlManager', {
   },
 
   /**
+   * 监听单个 Session 状态变化事件（轻量级）
+   * 当某个 session 的处理状态变化（processing/idle）时触发
+   * @param {Function} callback - 回调函数 (data: { sessionId, name, status, timestamp })
+   * @returns {Function} 取消监听函数
+   */
+  onSessionStatusChanged: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('session:statusChanged', handler);
+    return () => ipcRenderer.removeListener('session:statusChanged', handler);
+  },
+
+  /**
    * 监听消息添加事件（供看板实时更新）
    * @param {Function} callback - 回调函数 ({ sessionId, message: { role, text, timestamp } })
    * @returns {Function} 取消监听函数

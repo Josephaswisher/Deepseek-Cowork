@@ -98,6 +98,13 @@
       // 新增：卡片
       messagesUnit: '条消息',
       aiReplying: 'AI 正在回复...',
+      terminalTitle: '终端',
+      // 时间显示
+      time: {
+        justNow: '刚刚',
+        minutesAgo: '{count}分钟前',
+        hoursAgo: '{count}小时前'
+      },
       status: {
         idle: '空闲',
         processing: '处理中',

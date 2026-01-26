@@ -98,6 +98,13 @@
       // New: Card
       messagesUnit: 'messages',
       aiReplying: 'AI is replying...',
+      terminalTitle: 'terminal',
+      // Time display
+      time: {
+        justNow: 'just now',
+        minutesAgo: '{count}m ago',
+        hoursAgo: '{count}h ago'
+      },
       status: {
         idle: 'Idle',
         processing: 'Processing',

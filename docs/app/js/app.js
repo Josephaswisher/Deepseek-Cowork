@@ -1050,7 +1050,9 @@ class BrowserControlManagerApp {
     if (unsubHappyDisconnected) this.unsubscribers.push(unsubHappyDisconnected);
     
     // 监听 Happy AI 事件状态
+    // 后端已经延迟 100ms 发送 ready 事件，确保消息先被处理
     const unsubHappyEventStatus = window.browserControlManager.onHappyEventStatus?.((data) => {
+      console.log('[App] Received happy:eventStatus:', data.eventType);
       this.updateHappyEventStatus(data.eventType);
     });
     if (unsubHappyEventStatus) this.unsubscribers.push(unsubHappyEventStatus);

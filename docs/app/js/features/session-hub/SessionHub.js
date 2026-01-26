@@ -44,6 +44,7 @@ class SessionHub {
     this.bindEvents();
     this.subscribeToStateUpdates();
     this.subscribeToMessageUpdates();
+    this.subscribeToEventStatusUpdates();
     this.preloadSessionState();
     console.log('[SessionHub] Initialized');
   }
@@ -154,6 +155,140 @@ class SessionHub {
   }
 
   /**
+   * 订阅 Happy AI 事件状态更新（processing/ready）
+   * 用于实时更新当前 session 卡片的状态
+   */
+  subscribeToEventStatusUpdates() {
+    // 绑定方法上下文
+    this.handleEventStatusUpdated = this.handleEventStatusUpdated.bind(this);
+    this.handleSessionStatusChanged = this.handleSessionStatusChanged.bind(this);
+    
+    if (window.browserControlManager?.onHappyEventStatus) {
+      // Electron 版本：通过 IPC 监听 happy:eventStatus（当前 session 的状态）
+      this._unsubscribeEventStatus = window.browserControlManager.onHappyEventStatus(this.handleEventStatusUpdated);
+      console.log('[SessionHub] Subscribed to event status updates (Electron)');
+    } else if (window.apiAdapter?.on) {
+      // Web 版本：通过 WebSocket 监听
+      window.apiAdapter.on('happy:eventStatus', this.handleEventStatusUpdated);
+      console.log('[SessionHub] Subscribed to event status updates (Web)');
+    }
+    
+    // 订阅单个 session 状态变化事件（所有 session，包括非当前的）
+    if (window.browserControlManager?.onSessionStatusChanged) {
+      // Electron 版本
+      this._unsubscribeSessionStatus = window.browserControlManager.onSessionStatusChanged(this.handleSessionStatusChanged);
+      console.log('[SessionHub] Subscribed to session status changes (Electron)');
+    } else if (window.apiAdapter?.on) {
+      // Web 版本
+      window.apiAdapter.on('session:statusChanged', this.handleSessionStatusChanged);
+      console.log('[SessionHub] Subscribed to session status changes (Web)');
+    }
+  }
+
+  /**
+   * 处理 Happy AI 事件状态变更（当前 session）
+   * @param {Object} data { eventType, timestamp }
+   */
+  handleEventStatusUpdated(data) {
+    if (!data?.eventType) return;
+    
+    const eventType = data.eventType;
+    
+    // 将事件类型映射为 session 状态
+    let newStatus;
+    if (eventType === 'processing' || eventType === 'thinking' || eventType === 'waiting') {
+      newStatus = 'processing';
+    } else if (eventType === 'ready' || eventType === 'idle') {
+      newStatus = 'idle';
+    } else {
+      newStatus = eventType;
+    }
+    
+    // 更新当前 session 的状态
+    const currentSession = this.sessions.find(s => s.isCurrent);
+    if (currentSession) {
+      const oldStatus = currentSession.status;
+      currentSession.status = newStatus;
+      
+      // 如果面板可见且状态变化了，更新 UI
+      if (this.isVisible && oldStatus !== newStatus) {
+        this.updateSessionCardStatus(currentSession.sessionId, newStatus);
+      }
+    }
+  }
+
+  /**
+   * 处理单个 session 状态变化（所有 session，包括非当前的）
+   * @param {Object} data { sessionId, name, status, timestamp }
+   */
+  handleSessionStatusChanged(data) {
+    if (!data?.sessionId || !data?.status) return;
+    
+    const { sessionId, status } = data;
+    
+    // 更新 sessions 数组中对应 session 的状态
+    const session = this.sessions.find(s => s.sessionId === sessionId);
+    if (session) {
+      const oldStatus = session.status;
+      session.status = status;
+      
+      // 如果面板可见且状态变化了，更新 UI
+      if (this.isVisible && oldStatus !== status) {
+        this.updateSessionCardStatus(sessionId, status);
+      }
+    }
+  }
+
+  /**
+   * 增量更新指定 session 卡片的状态（避免重新渲染整个列表）
+   * @param {string} sessionId session ID
+   * @param {string} newStatus 新状态
+   */
+  updateSessionCardStatus(sessionId, newStatus) {
+    const card = this.elements.list?.querySelector(`.session-card[data-session-id="${sessionId}"]`);
+    if (!card) return;
+    
+    const t = this.getTranslator();
+    const statusClass = this.getStatusClass(newStatus);
+    const statusText = t(`sessionHub.status.${newStatus}`) || newStatus;
+    const isProcessing = statusClass === 'processing';
+    
+    // 更新状态点样式
+    const statusDot = card.querySelector('.session-card-status-dot');
+    if (statusDot) {
+      statusDot.className = `session-card-status-dot ${statusClass}`;
+    }
+    
+    // 更新状态文本
+    const statusTextEl = card.querySelector('.session-card-status-text');
+    if (statusTextEl) {
+      statusTextEl.textContent = statusText;
+    }
+    
+    // 更新 footer 的"AI 正在回复"提示
+    const footer = card.querySelector('.session-card-footer');
+    if (footer) {
+      const existingTyping = footer.querySelector('.session-card-typing');
+      if (isProcessing && !existingTyping) {
+        // 添加"AI 正在回复"提示
+        const typingHtml = `
+          <span class="session-card-typing">
+            <span class="session-card-typing-dot"></span>
+            ${t('sessionHub.aiReplying')}
+          </span>
+        `;
+        footer.insertAdjacentHTML('beforeend', typingHtml);
+      } else if (!isProcessing && existingTyping) {
+        // 移除"AI 正在回复"提示
+        existingTyping.remove();
+      }
+    }
+    
+    // 更新统计栏
+    this.updateStats();
+  }
+
+  /**
    * 处理消息添加事件
    * @param {Object} data { sessionId, message: { role, text, timestamp } }
    */
@@ -240,8 +375,7 @@ class SessionHub {
       totalCount: document.getElementById('session-hub-total-count'),
       searchInput: document.getElementById('session-hub-search-input'),
       statIdle: document.getElementById('stat-idle'),
-      statProcessing: document.getElementById('stat-processing'),
-      statConnected: document.getElementById('stat-connected')
+      statProcessing: document.getElementById('stat-processing')
     };
   }
 
@@ -478,19 +612,19 @@ class SessionHub {
   updateStats() {
     if (!this.elements.stats) return;
     
-    // 统计各状态数量
+    // 统计各状态数量（只统计空闲和处理中）
     const counts = {
       idle: 0,
-      processing: 0,
-      connected: 0
+      processing: 0
     };
     
     this.sessions.forEach(session => {
       const status = this.getStatusClass(session.status);
-      if (counts.hasOwnProperty(status)) {
-        counts[status]++;
+      if (status === 'processing') {
+        counts.processing++;
       } else {
-        counts.idle++; // 默认为 idle
+        // 其他状态（idle, connected, disconnected）都归为空闲
+        counts.idle++;
       }
     });
     
@@ -502,10 +636,6 @@ class SessionHub {
     if (this.elements.statProcessing) {
       const countEl = this.elements.statProcessing.querySelector('.count');
       if (countEl) countEl.textContent = counts.processing;
-    }
-    if (this.elements.statConnected) {
-      const countEl = this.elements.statConnected.querySelector('.count');
-      if (countEl) countEl.textContent = counts.connected;
     }
   }
 
@@ -555,7 +685,8 @@ class SessionHub {
         : (session.name === this.currentSessionId || 
            session.workspaceDir === this.app?.workspaceSettings?.getWorkspaceDir?.());
     const statusClass = this.getStatusClass(session.status);
-    const statusText = t(`sessionHub.status.${session.status}`) || session.status || 'idle';
+    const normalizedStatus = session.status || 'idle';
+    const statusText = t(`sessionHub.status.${normalizedStatus}`) || normalizedStatus;
     const isProcessing = statusClass === 'processing';
     
     // 格式化路径显示
@@ -608,7 +739,7 @@ class SessionHub {
             <div class="terminal-dot red"></div>
             <div class="terminal-dot yellow"></div>
             <div class="terminal-dot green"></div>
-            <span class="terminal-title">session</span>
+            <span class="terminal-title">${t('sessionHub.terminalTitle')}</span>
           </div>
           <div class="terminal-body">
             ${terminalContent}
@@ -861,10 +992,11 @@ class SessionHub {
    * @returns {string}
    */
   formatSessionInfo(session) {
+    const t = this.getTranslator();
     const parts = [];
     
     if (session.messageCount) {
-      parts.push(`${session.messageCount} messages`);
+      parts.push(`${session.messageCount} ${t('sessionHub.messagesUnit')}`);
     }
     
     if (session.lastActiveAt) {
@@ -873,11 +1005,13 @@ class SessionHub {
       const diff = now - time;
       
       if (diff < 60000) {
-        parts.push('just now');
+        parts.push(t('sessionHub.time.justNow'));
       } else if (diff < 3600000) {
-        parts.push(`${Math.floor(diff / 60000)}m ago`);
+        const mins = Math.floor(diff / 60000);
+        parts.push(t('sessionHub.time.minutesAgo').replace('{count}', mins));
       } else if (diff < 86400000) {
-        parts.push(`${Math.floor(diff / 3600000)}h ago`);
+        const hours = Math.floor(diff / 3600000);
+        parts.push(t('sessionHub.time.hoursAgo').replace('{count}', hours));
       } else {
         parts.push(time.toLocaleDateString());
       }
@@ -931,6 +1065,18 @@ class SessionHub {
     if (this._unsubscribeMessage) {
       this._unsubscribeMessage();
       this._unsubscribeMessage = null;
+    }
+    
+    // 取消订阅事件状态更新
+    if (this._unsubscribeEventStatus) {
+      this._unsubscribeEventStatus();
+      this._unsubscribeEventStatus = null;
+    }
+    
+    // 取消订阅单个 session 状态变化
+    if (this._unsubscribeSessionStatus) {
+      this._unsubscribeSessionStatus();
+      this._unsubscribeSessionStatus = null;
     }
     
     this.elements = {};

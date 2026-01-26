@@ -2222,6 +2222,8 @@ function setupHappyServiceEventForwarding() {
     'daemon:startProgress',
     // session 状态更新事件（由 SessionManager 触发，HappyService 转发）
     'session:stateUpdated',
+    // 单个 session 状态变化事件（轻量级，用于增量更新 SessionHub 卡片）
+    'session:statusChanged',
     // 消息添加事件（供看板实时更新）
     'message:added'
   ];

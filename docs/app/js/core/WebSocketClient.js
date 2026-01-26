@@ -124,6 +124,8 @@ class WebSocketClient {
             'daemon:startProgress',
             // session 状态更新事件
             'session:stateUpdated',
+            // 单个 session 状态变化事件（轻量级）
+            'session:statusChanged',
             // 消息添加事件（供看板实时更新）
             'message:added'
         ];
