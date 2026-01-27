@@ -4,7 +4,7 @@
  * 负责在服务器退出时按顺序关闭所有服务
  */
 
-const { getServices } = require('./bootstrap');
+const modulesManager = require('./modulesManager');
 const logger = require('./utils/logger');
 
 /**
@@ -13,27 +13,8 @@ const logger = require('./utils/logger');
 async function shutdownServices() {
     logger.info('正在关闭服务器...');
     
-    const services = getServices();
-
-    // 关闭浏览器控制服务
-    if (services.browserControl) {
-        try {
-            await services.browserControl.stop();
-            logger.info('浏览器控制服务已关闭');
-        } catch (err) {
-            logger.error('关闭浏览器控制服务时出错:', err);
-        }
-    }
-
-    // 关闭 Explorer 服务
-    if (services.explorer) {
-        try {
-            await services.explorer.stop();
-            logger.info('Explorer 服务已关闭');
-        } catch (err) {
-            logger.error('关闭 Explorer 服务时出错:', err);
-        }
-    }
+    // 使用模块管理器关闭所有模块（按启动顺序的逆序）
+    await modulesManager.shutdownModules();
 
     // 添加超时机制，防止进程卡住
     setTimeout(() => {
