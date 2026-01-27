@@ -204,6 +204,40 @@ deepseek-cowork open
 | `deepseek-cowork status` | Check service status |
 | `deepseek-cowork open` | Open web interface in browser |
 | `deepseek-cowork config` | View/edit configuration |
+| `deepseek-cowork deploy` | Deploy skills to work directories |
+| `deepseek-cowork module` | Manage server modules |
+
+#### Deploy Skills
+
+```bash
+# Deploy built-in skills to work directories
+deepseek-cowork deploy
+
+# Deploy with Chinese templates
+deepseek-cowork deploy --lang zh
+
+# Deploy custom skill from any path
+deepseek-cowork deploy --from ./my-skill --target my-project
+
+# Check deployment status
+deepseek-cowork deploy status
+```
+
+#### Manage Server Modules
+
+```bash
+# List available modules
+deepseek-cowork module list
+
+# Deploy a module
+deepseek-cowork module deploy demo-module
+
+# Deploy custom module from any path
+deepseek-cowork module deploy my-module --from ./my-module-source
+
+# Check deployed modules status
+deepseek-cowork module status
+```
 
 ### Build Web Version
 

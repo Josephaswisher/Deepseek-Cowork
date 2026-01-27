@@ -189,7 +189,16 @@ try {
     );
     console.log('✓ config/ directory copied (CommonJS mode)');
     
-    // 5. 创建 dist/package.json
+    // 5. 复制 deploy/ 目录（skills 和 user-server-modules）
+    console.log('\n📁 Copying deploy/ directory...');
+    copyDirSync(
+        join(PROJECT_ROOT, 'deploy'),
+        join(DIST_DIR, 'deploy'),
+        { exclude: ['node_modules'] }
+    );
+    console.log('✓ deploy/ directory copied');
+    
+    // 6. 创建 dist/package.json
     console.log('\n📄 Creating package.json...');
     
     // 读取当前版本和根目录的 overrides 配置
@@ -325,14 +334,14 @@ try {
     );
     console.log('✓ package.json created');
     
-    // 6. 复制 README
+    // 7. 复制 README
     const readmePath = join(PROJECT_ROOT, 'README.md');
     if (existsSync(readmePath)) {
         copyFileSync(readmePath, join(DIST_DIR, 'README.md'));
         console.log('✓ README.md copied');
     }
     
-    // 7. 统计输出
+    // 8. 统计输出
     console.log('\n' + '='.repeat(50));
     console.log('✅ Build completed successfully!');
     console.log('='.repeat(50));

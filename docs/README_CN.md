@@ -204,6 +204,40 @@ deepseek-cowork open
 | `deepseek-cowork status` | 查看服务状态 |
 | `deepseek-cowork open` | 在浏览器中打开 Web 界面 |
 | `deepseek-cowork config` | 查看/编辑配置 |
+| `deepseek-cowork deploy` | 部署技能到工作目录 |
+| `deepseek-cowork module` | 管理服务器模块 |
+
+#### 部署技能
+
+```bash
+# 部署内置技能到工作目录
+deepseek-cowork deploy
+
+# 使用中文模板部署
+deepseek-cowork deploy --lang zh
+
+# 从指定路径部署自定义技能
+deepseek-cowork deploy --from ./my-skill --target my-project
+
+# 查看部署状态
+deepseek-cowork deploy status
+```
+
+#### 管理服务器模块
+
+```bash
+# 列出可用模块
+deepseek-cowork module list
+
+# 部署模块
+deepseek-cowork module deploy demo-module
+
+# 从指定路径部署自定义模块
+deepseek-cowork module deploy my-module --from ./my-module-source
+
+# 查看已部署模块状态
+deepseek-cowork module status
+```
 
 ### 构建 Web 版本
 

@@ -45,6 +45,8 @@ import { openCommand } from '../commands/open.mjs';
 import { loginCommand } from '../commands/login.mjs';
 import { logoutCommand } from '../commands/logout.mjs';
 import { cleanupCommand } from '../commands/cleanup.mjs';
+import { deployCommand } from '../commands/deploy.mjs';
+import { moduleCommand } from '../commands/module.mjs';
 
 // 配置程序
 program
@@ -104,6 +106,24 @@ program
     .option('-a, --all', 'Also clean up session state files (sessions.json)')
     .option('--debug', 'Show debug information')
     .action(cleanupCommand);
+
+program
+    .command('deploy [action]')
+    .description('Deploy skills to work directories')
+    .option('--target <name>', 'Specify target work directory by name')
+    .option('--lang <lang>', 'Language (en/zh)', 'en')
+    .option('--from <path>', 'Deploy custom skill from specified path')
+    .option('--no-backup', 'Skip backup when resetting')
+    .option('--debug', 'Enable debug mode')
+    .action(deployCommand);
+
+program
+    .command('module [action] [name]')
+    .description('Manage server modules')
+    .option('--lang <lang>', 'Language (en/zh)', 'en')
+    .option('--from <path>', 'Deploy custom module from specified path')
+    .option('--debug', 'Enable debug mode')
+    .action(moduleCommand);
 
 // 默认命令：显示帮助
 program
