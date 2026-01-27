@@ -23,8 +23,8 @@
 # 部署演示模块到用户数据目录
 node deploy/index.js module demo-module
 
-# 重启服务后访问
-# http://localhost:3000/demo/
+# 重启服务后访问（支持热加载，无需重启）
+# http://localhost:3333/demo/
 ```
 
 ## 文件结构

@@ -107,7 +107,12 @@ const MESSAGES = {
         moduleStatusTitle: 'Deployed Server Modules',
         noModulesDeployed: 'No modules deployed',
         userDataDir: (path) => `User data directory: ${path}`,
-        restartHint: 'Please restart the service to load the new module'
+        restartHint: 'Please restart the service to load the new module',
+        // Hot reload messages
+        hotLoadAttempting: (name) => `Attempting hot reload: ${name}`,
+        hotLoadSuccess: (name) => `Hot reload successful: ${name}`,
+        hotLoadFailed: (name, err) => `Hot reload failed (${name}): ${err}`,
+        hotLoadSkipped: 'Service not running, hot reload skipped'
     },
     zh: {
         loadedWorkDirs: (count) => `加载了 ${count} 个工作目录配置`,
@@ -162,7 +167,12 @@ const MESSAGES = {
         moduleStatusTitle: '已部署的服务器模块',
         noModulesDeployed: '暂无已部署的模块',
         userDataDir: (path) => `用户数据目录: ${path}`,
-        restartHint: '请重启服务以加载新模块'
+        restartHint: '请重启服务以加载新模块',
+        // Hot reload messages
+        hotLoadAttempting: (name) => `正在尝试热加载: ${name}`,
+        hotLoadSuccess: (name) => `热加载成功: ${name}`,
+        hotLoadFailed: (name, err) => `热加载失败 (${name}): ${err}`,
+        hotLoadSkipped: '服务未运行，跳过热加载'
     }
 };
 
@@ -711,10 +721,81 @@ class ServerModuleDeployer {
         this.updateConfig(moduleName, 'add');
 
         this.log('success', this.msg.moduleDeployComplete(moduleName));
-        this.log('info', this.msg.restartHint);
+        
+        // Try hot reload
+        await this.tryHotLoad(moduleName);
+        
         console.log(`\n${this.msg.userDataDir(this.userDataDir)}\n`);
 
         return true;
+    }
+
+    /**
+     * Try to hot load the module via API
+     * If service is not running, silently skip
+     */
+    async tryHotLoad(moduleName) {
+        const apiUrl = `http://localhost:3333/api/modules/load`;
+        
+        try {
+            this.log('info', this.msg.hotLoadAttempting(moduleName));
+            
+            // Use native http module to avoid dependency
+            const result = await new Promise((resolve, reject) => {
+                const http = require('http');
+                const postData = JSON.stringify({ name: moduleName });
+                
+                const req = http.request(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(postData)
+                    },
+                    timeout: 5000
+                }, (res) => {
+                    let data = '';
+                    res.on('data', chunk => data += chunk);
+                    res.on('end', () => {
+                        try {
+                            resolve(JSON.parse(data));
+                        } catch (e) {
+                            reject(new Error(`Invalid response: ${data}`));
+                        }
+                    });
+                });
+                
+                req.on('error', (err) => {
+                    // Connection refused means service is not running
+                    if (err.code === 'ECONNREFUSED') {
+                        resolve({ skipped: true });
+                    } else {
+                        reject(err);
+                    }
+                });
+                
+                req.on('timeout', () => {
+                    req.destroy();
+                    resolve({ skipped: true });
+                });
+                
+                req.write(postData);
+                req.end();
+            });
+            
+            if (result.skipped) {
+                this.log('info', this.msg.hotLoadSkipped);
+                this.log('info', this.msg.restartHint);
+            } else if (result.success) {
+                this.log('success', this.msg.hotLoadSuccess(moduleName));
+            } else {
+                this.log('warn', this.msg.hotLoadFailed(moduleName, result.error));
+                this.log('info', this.msg.restartHint);
+            }
+            
+        } catch (error) {
+            this.log('warn', this.msg.hotLoadFailed(moduleName, error.message));
+            this.log('info', this.msg.restartHint);
+        }
     }
 
     /**

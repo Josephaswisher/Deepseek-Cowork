@@ -29,6 +29,9 @@ let bootOrder = [];
 // 存储运行时选项
 let runtimeOptions = {};
 
+// 存储运行时上下文（用于热加载）
+let runtimeContext = null;
+
 /**
  * 清理模块缓存
  * @param {string} modulePath 模块路径
@@ -308,6 +311,9 @@ async function bootstrapModule(instance, moduleConfig, context) {
  * @param {Object} context 启动上下文 { app, io, http, config, PORT }
  */
 async function bootstrapModules(context) {
+    // 保存运行时上下文，用于热加载
+    runtimeContext = context;
+    
     const { config } = context;
     const enabledModules = getEnabledModules(config);
     
@@ -346,6 +352,215 @@ async function shutdownModules() {
     
     // 清空状态
     bootOrder = [];
+}
+
+// ============================================================
+// 热加载 API - 运行时动态加载/卸载模块
+// ============================================================
+
+/**
+ * 运行时加载单个模块
+ * @param {string} moduleName 模块名称
+ * @returns {Object} 加载结果 { success, data?, error? }
+ */
+async function loadSingleModule(moduleName) {
+    try {
+        // 检查运行时上下文是否可用
+        if (!runtimeContext) {
+            return { success: false, error: '服务未完全启动，无法热加载模块' };
+        }
+        
+        // 检查模块是否已加载
+        if (moduleInstances[moduleName]) {
+            return { success: false, error: `模块 ${moduleName} 已加载，请先卸载或使用重载` };
+        }
+        
+        // 重新读取用户配置以获取最新的模块信息
+        const userConfig = loadUserConfig();
+        if (!userConfig || !userConfig.modules) {
+            return { success: false, error: '无法读取用户模块配置' };
+        }
+        
+        // 找到目标模块配置
+        const moduleConfig = userConfig.modules.find(m => m.name === moduleName);
+        if (!moduleConfig) {
+            return { success: false, error: `模块配置不存在: ${moduleName}` };
+        }
+        
+        // 标记为用户模块
+        moduleConfig.source = 'user';
+        
+        // 解析模块路径
+        const modulePath = resolveModulePath(moduleConfig);
+        
+        // 检查模块文件是否存在
+        if (!fs.existsSync(modulePath)) {
+            return { success: false, error: `模块文件不存在: ${modulePath}` };
+        }
+        
+        // 清理可能的旧缓存
+        clearModuleCache(modulePath);
+        
+        logger.info(`[热加载] 正在加载模块: ${moduleName}...`);
+        
+        // 动态加载模块
+        const serviceModule = require(modulePath);
+        
+        // 获取 setup 函数
+        const setupFunction = serviceModule[moduleConfig.setupFunction];
+        if (typeof setupFunction !== 'function') {
+            return { success: false, error: `模块 ${moduleName} 的 setup 函数不存在: ${moduleConfig.setupFunction}` };
+        }
+        
+        // 生成初始化参数
+        let moduleOptions = {};
+        if (typeof moduleConfig.getOptions === 'function') {
+            moduleOptions = moduleConfig.getOptions(runtimeContext.config, runtimeOptions.runtimeContext);
+        }
+        
+        // 创建模块实例
+        const instance = setupFunction(moduleOptions);
+        moduleInstances[moduleName] = instance;
+        
+        // 添加到合并配置中（如果不存在）
+        if (!mergedModuleConfigs.find(m => m.name === moduleName)) {
+            mergedModuleConfigs.push(moduleConfig);
+        }
+        
+        // 启动模块
+        await bootstrapModule(instance, moduleConfig, runtimeContext);
+        
+        logger.info(`[热加载] 模块 ${moduleName} 加载成功`);
+        
+        return { 
+            success: true, 
+            data: { 
+                name: moduleName, 
+                status: 'loaded',
+                source: 'user'
+            } 
+        };
+        
+    } catch (error) {
+        logger.error(`[热加载] 加载模块 ${moduleName} 失败:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 运行时卸载单个模块
+ * @param {string} moduleName 模块名称
+ * @returns {Object} 卸载结果 { success, data?, error? }
+ */
+async function unloadSingleModule(moduleName) {
+    try {
+        // 检查模块是否已加载
+        const instance = moduleInstances[moduleName];
+        if (!instance) {
+            return { success: false, error: `模块 ${moduleName} 未加载` };
+        }
+        
+        // 找到模块配置
+        const moduleConfig = mergedModuleConfigs.find(m => m.name === moduleName);
+        
+        // 不允许卸载内置模块
+        if (moduleConfig && moduleConfig.source !== 'user') {
+            return { success: false, error: `不允许卸载内置模块: ${moduleName}` };
+        }
+        
+        logger.info(`[热加载] 正在卸载模块: ${moduleName}...`);
+        
+        // 调用 stop 方法
+        if (instance.stop && typeof instance.stop === 'function') {
+            await instance.stop();
+        }
+        
+        // 从实例映射中移除
+        delete moduleInstances[moduleName];
+        
+        // 从启动顺序中移除
+        const bootIndex = bootOrder.indexOf(moduleName);
+        if (bootIndex !== -1) {
+            bootOrder.splice(bootIndex, 1);
+        }
+        
+        // 清理 require 缓存
+        if (moduleConfig) {
+            const modulePath = resolveModulePath(moduleConfig);
+            clearModuleCache(modulePath);
+        }
+        
+        logger.info(`[热加载] 模块 ${moduleName} 已卸载`);
+        
+        return { 
+            success: true, 
+            data: { 
+                name: moduleName, 
+                status: 'unloaded' 
+            } 
+        };
+        
+    } catch (error) {
+        logger.error(`[热加载] 卸载模块 ${moduleName} 失败:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 运行时重载单个模块（卸载后重新加载）
+ * @param {string} moduleName 模块名称
+ * @returns {Object} 重载结果 { success, data?, error? }
+ */
+async function reloadModule(moduleName) {
+    try {
+        logger.info(`[热加载] 正在重载模块: ${moduleName}...`);
+        
+        // 如果模块已加载，先卸载
+        if (moduleInstances[moduleName]) {
+            const unloadResult = await unloadSingleModule(moduleName);
+            if (!unloadResult.success) {
+                return unloadResult;
+            }
+        }
+        
+        // 重新加载
+        const loadResult = await loadSingleModule(moduleName);
+        if (!loadResult.success) {
+            return loadResult;
+        }
+        
+        logger.info(`[热加载] 模块 ${moduleName} 重载成功`);
+        
+        return { 
+            success: true, 
+            data: { 
+                name: moduleName, 
+                status: 'reloaded' 
+            } 
+        };
+        
+    } catch (error) {
+        logger.error(`[热加载] 重载模块 ${moduleName} 失败:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 获取所有已加载模块的状态信息
+ * @returns {Array} 模块状态列表
+ */
+function getModulesStatus() {
+    return mergedModuleConfigs.map(config => {
+        const instance = moduleInstances[config.name];
+        return {
+            name: config.name,
+            source: config.source || 'builtin',
+            enabled: config.enabled !== false,
+            loaded: !!instance,
+            running: instance ? (instance.isRunning !== undefined ? instance.isRunning : true) : false,
+            features: config.features || {}
+        };
+    });
 }
 
 /**
@@ -393,5 +608,10 @@ module.exports = {
     getRuntimeOptions,
     reset,
     clearModuleCache,
-    defaultPathResolver
+    defaultPathResolver,
+    // 热加载 API
+    loadSingleModule,
+    unloadSingleModule,
+    reloadModule,
+    getModulesStatus
 };

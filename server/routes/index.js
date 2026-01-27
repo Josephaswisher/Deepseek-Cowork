@@ -7,6 +7,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const modulesManager = require('../modulesManager');
 
 // 服务列表配置
 const servicesList = [
@@ -100,6 +101,107 @@ function setupRoutes(app, config, io) {
                     baseUrl: config.server?.baseUrl
                 }
             });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
+    // ============================================================
+    // 模块管理 API - 热加载功能
+    // ============================================================
+
+    // GET /api/modules - 列出所有已加载模块
+    app.get('/api/modules', (req, res) => {
+        try {
+            const modules = modulesManager.getModulesStatus();
+            res.json({
+                success: true,
+                data: modules
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
+    // POST /api/modules/load - 加载指定模块
+    app.post('/api/modules/load', async (req, res) => {
+        try {
+            const { name } = req.body;
+            
+            if (!name) {
+                return res.status(400).json({
+                    success: false,
+                    error: '缺少模块名称参数 (name)'
+                });
+            }
+            
+            const result = await modulesManager.loadSingleModule(name);
+            
+            if (result.success) {
+                res.json(result);
+            } else {
+                res.status(400).json(result);
+            }
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
+    // POST /api/modules/unload - 卸载指定模块
+    app.post('/api/modules/unload', async (req, res) => {
+        try {
+            const { name } = req.body;
+            
+            if (!name) {
+                return res.status(400).json({
+                    success: false,
+                    error: '缺少模块名称参数 (name)'
+                });
+            }
+            
+            const result = await modulesManager.unloadSingleModule(name);
+            
+            if (result.success) {
+                res.json(result);
+            } else {
+                res.status(400).json(result);
+            }
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
+
+    // POST /api/modules/reload - 重载指定模块
+    app.post('/api/modules/reload', async (req, res) => {
+        try {
+            const { name } = req.body;
+            
+            if (!name) {
+                return res.status(400).json({
+                    success: false,
+                    error: '缺少模块名称参数 (name)'
+                });
+            }
+            
+            const result = await modulesManager.reloadModule(name);
+            
+            if (result.success) {
+                res.json(result);
+            } else {
+                res.status(400).json(result);
+            }
         } catch (error) {
             res.status(500).json({
                 success: false,
