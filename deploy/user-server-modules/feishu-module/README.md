@@ -10,21 +10,29 @@
 - **AI 集成**: 与 HappyService 无缝集成
 - **管理页面**: 提供 Web 界面进行配置和监控
 
-## 安装依赖
-
-```bash
-# 在项目根目录安装飞书 SDK
-npm install @larksuiteoapi/node-sdk
-```
-
 ## 部署
 
 ```bash
-# 使用部署脚本
-node deploy/index.js module feishu-module
+# 使用部署脚本（会自动安装依赖）
+deepseek-cowork module deploy feishu-module
 
 # 或手动复制到用户模块目录
 cp -r deploy/user-server-modules/feishu-module ~/.deepseek-cowork/modules/
+cd ~/.deepseek-cowork/modules/feishu-module
+npm install
+```
+
+### 依赖管理
+
+模块目录中包含 `package.json` 文件，列出了所需的依赖包：
+- `@larksuiteoapi/node-sdk` - 飞书官方 SDK
+
+**自动安装**：使用 `deepseek-cowork module deploy` 命令部署时，会自动检测 `package.json` 并执行 `npm install` 安装依赖。
+
+**手动安装**：如果自动安装失败，可以手动进入模块目录执行：
+```bash
+cd ~/.deepseek-cowork/user-server-modules/feishu-module
+npm install
 ```
 
 ## 配置

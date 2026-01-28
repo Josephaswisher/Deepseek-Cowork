@@ -1,0 +1,9 @@
+{
+  "name": "feishu-module",
+  "version": "1.0.0",
+  "description": "飞书/Lark 消息通道模块，实现飞书消息与 deepseek-cowork AI 核心的双向通信",
+  "private": true,
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.56.0"
+  }
+}

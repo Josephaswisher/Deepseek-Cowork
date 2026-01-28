@@ -10,6 +10,7 @@ import path from 'path';
 import http from 'http';
 import chalk from 'chalk';
 import ora from 'ora';
+import { spawn } from 'child_process';
 import { createRequire } from 'module';
 import { getMessages } from './messages.mjs';
 import {
@@ -165,6 +166,13 @@ export class ServerModuleDeployer {
             // 复制模块文件
             this.copyDirRecursive(sourcePath, destPath);
 
+            // 检查是否有 package.json，如果有则安装依赖
+            const packageJsonPath = path.join(destPath, 'package.json');
+            if (fs.existsSync(packageJsonPath)) {
+                spinner.text = `Installing dependencies for ${moduleName}...`;
+                await this.installDependencies(destPath);
+            }
+
             // 更新配置文件
             this.updateConfig(moduleName, 'add');
 
@@ -180,6 +188,57 @@ export class ServerModuleDeployer {
             spinner.fail(`Deploy failed: ${error.message}`);
             return false;
         }
+    }
+
+    /**
+     * 安装模块依赖
+     * @param {string} modulePath - 模块目录路径
+     * @returns {Promise<void>}
+     */
+    async installDependencies(modulePath) {
+        return new Promise((resolve, reject) => {
+            const isWindows = process.platform === 'win32';
+            const npmCmd = isWindows ? 'npm.cmd' : 'npm';
+            
+            const npmProcess = spawn(npmCmd, ['install', '--production'], {
+                cwd: modulePath,
+                stdio: 'pipe',
+                shell: false
+            });
+            
+            let stdout = '';
+            let stderr = '';
+            
+            npmProcess.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+            
+            npmProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+            
+            npmProcess.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    // npm install 失败不应该阻止部署，只记录警告
+                    console.log(chalk.yellow(`\n警告: npm install 失败 (退出码: ${code})`));
+                    console.log(chalk.dim('你可以稍后手动运行: npm install'));
+                    if (stderr) {
+                        console.log(chalk.dim(stderr));
+                    }
+                    resolve(); // 仍然继续部署流程
+                }
+            });
+            
+            npmProcess.on('error', (error) => {
+                // 如果找不到 npm，给出提示但不阻止部署
+                console.log(chalk.yellow(`\n警告: 无法执行 npm install: ${error.message}`));
+                console.log(chalk.dim('请确保已安装 Node.js 和 npm'));
+                console.log(chalk.dim('你可以稍后手动运行: npm install'));
+                resolve(); // 继续部署流程
+            });
+        });
     }
 
     /**
