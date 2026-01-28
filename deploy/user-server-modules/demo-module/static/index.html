@@ -300,7 +300,7 @@
         </div>
         
         <div class="card">
-            <h2>API 接口</h2>
+            <h2>基础 API 接口</h2>
             <ul class="api-list">
                 <li class="api-item">
                     <span class="api-method get">GET</span>
@@ -330,6 +330,48 @@
                 <button class="test-btn secondary" onclick="testEcho()">测试 /api/demo/echo</button>
                 <button class="test-btn secondary" onclick="testInfo()">测试 /api/demo/info</button>
                 <div id="resultBox" class="result-box"></div>
+            </div>
+        </div>
+        
+        <div class="card" style="border-left: 4px solid var(--primary-color);">
+            <h2>核心服务集成演示</h2>
+            <p style="margin-bottom: 16px;">演示如何在用户模块中调用核心库（HappyService、MessageStore）。</p>
+            
+            <h3>核心服务状态</h3>
+            <div id="servicesStatus" style="padding: 12px; background: var(--code-bg); border-radius: 6px; margin: 12px 0;">
+                <span style="color: var(--text-secondary);">点击下方按钮检查...</span>
+            </div>
+            
+            <h3>核心服务 API</h3>
+            <ul class="api-list">
+                <li class="api-item">
+                    <span class="api-method get">GET</span>
+                    <span class="api-path">/api/demo/services</span>
+                    <span class="api-desc">核心服务可用性</span>
+                </li>
+                <li class="api-item">
+                    <span class="api-method get">GET</span>
+                    <span class="api-path">/api/demo/messages</span>
+                    <span class="api-desc">获取消息历史（MessageStore）</span>
+                </li>
+                <li class="api-item">
+                    <span class="api-method get">GET</span>
+                    <span class="api-path">/api/demo/recent</span>
+                    <span class="api-desc">最近消息（事件监听）</span>
+                </li>
+                <li class="api-item">
+                    <span class="api-method post">POST</span>
+                    <span class="api-path">/api/demo/send</span>
+                    <span class="api-desc">发送消息到 AI（HappyService）</span>
+                </li>
+            </ul>
+            
+            <div class="test-section">
+                <h3>核心服务测试</h3>
+                <button class="test-btn" onclick="testServices()">检查服务状态</button>
+                <button class="test-btn secondary" onclick="testMessages()">获取消息历史</button>
+                <button class="test-btn secondary" onclick="testRecent()">最近收到的消息</button>
+                <div id="servicesResultBox" class="result-box"></div>
             </div>
         </div>
         
@@ -389,29 +431,53 @@
                 </div>
                 
                 <div class="step-item">
-                    <strong>编写模块入口 (index.js)</strong>
+                    <strong>编写模块入口 (index.js) - 带核心服务集成</strong>
                     <div class="code-block">
 <span class="keyword">const</span> { EventEmitter } = <span class="function">require</span>(<span class="string">'events'</span>);
 
 <span class="keyword">function</span> <span class="function">setupMyModuleService</span>(options = {}) {
+    <span class="comment">// 从 options 获取注入的核心服务</span>
+    <span class="keyword">const</span> HappyService = options.HappyService;
+    <span class="keyword">const</span> MessageStore = options.MessageStore;
+    
     <span class="keyword">class</span> MyModuleService <span class="keyword">extends</span> EventEmitter {
+        <span class="function">constructor</span>() {
+            <span class="keyword">super</span>();
+            <span class="keyword">this</span>.happyService = HappyService;
+            <span class="keyword">this</span>.messageStore = MessageStore;
+        }
+        
         <span class="keyword">async</span> <span class="function">init</span>() {
             console.<span class="function">log</span>(<span class="string">'[MyModule] 初始化'</span>);
+            
+            <span class="comment">// 监听 AI 消息事件</span>
+            <span class="keyword">if</span> (<span class="keyword">this</span>.happyService) {
+                <span class="keyword">this</span>.happyService.<span class="function">on</span>(<span class="string">'happy:message'</span>, (msg) => {
+                    console.<span class="function">log</span>(<span class="string">'收到消息:'</span>, msg.role);
+                });
+            }
         }
         
         <span class="function">setupRoutes</span>(app) {
-            app.<span class="function">get</span>(<span class="string">'/api/my-module/hello'</span>, (req, res) => {
-                res.<span class="function">json</span>({ message: <span class="string">'Hello from my module!'</span> });
+            <span class="comment">// 调用 HappyService 发送消息</span>
+            app.<span class="function">post</span>(<span class="string">'/api/my-module/send'</span>, <span class="keyword">async</span> (req, res) => {
+                <span class="keyword">if</span> (<span class="keyword">this</span>.happyService) {
+                    <span class="keyword">await</span> <span class="keyword">this</span>.happyService.<span class="function">sendMessage</span>(req.body.message);
+                    res.<span class="function">json</span>({ success: <span class="keyword">true</span> });
+                }
+            });
+            
+            <span class="comment">// 调用 MessageStore 获取历史</span>
+            app.<span class="function">get</span>(<span class="string">'/api/my-module/history'</span>, (req, res) => {
+                <span class="keyword">if</span> (<span class="keyword">this</span>.messageStore) {
+                    <span class="keyword">const</span> msgs = <span class="keyword">this</span>.messageStore.<span class="function">getMessages</span>(req.query.sessionId);
+                    res.<span class="function">json</span>({ messages: msgs });
+                }
             });
         }
         
-        <span class="keyword">async</span> <span class="function">start</span>() {
-            <span class="keyword">this</span>.<span class="function">emit</span>(<span class="string">'started'</span>);
-        }
-        
-        <span class="keyword">async</span> <span class="function">stop</span>() {
-            <span class="keyword">this</span>.<span class="function">emit</span>(<span class="string">'stopped'</span>);
-        }
+        <span class="keyword">async</span> <span class="function">start</span>() { <span class="keyword">this</span>.<span class="function">emit</span>(<span class="string">'started'</span>); }
+        <span class="keyword">async</span> <span class="function">stop</span>() { <span class="keyword">this</span>.<span class="function">emit</span>(<span class="string">'stopped'</span>); }
     }
     <span class="keyword">return new</span> <span class="function">MyModuleService</span>();
 }
@@ -421,7 +487,7 @@ module.exports = { setupMyModuleService };
                 </div>
                 
                 <div class="step-item">
-                    <strong>创建配置文件 (userServerModulesConfig.js)</strong>
+                    <strong>创建配置文件 (userServerModulesConfig.js) - 注入核心服务</strong>
                     <div class="code-block">
 module.exports = {
     modules: [
@@ -430,9 +496,12 @@ module.exports = {
             module: <span class="string">'./my-module'</span>,
             setupFunction: <span class="string">'setupMyModuleService'</span>,
             enabled: <span class="keyword">true</span>,
-            features: {
-                hasRoutes: <span class="keyword">true</span>
-            }
+            features: { hasRoutes: <span class="keyword">true</span> },
+            <span class="comment">// 通过 getOptions 注入核心服务</span>
+            getOptions: (config, runtimeContext) => ({
+                HappyService: runtimeContext?.services?.HappyService,
+                MessageStore: runtimeContext?.services?.MessageStore
+            })
         }
     ]
 };
@@ -472,6 +541,7 @@ node deploy/index.js module --remove demo-module
         // 页面加载时获取状态
         window.onload = function() {
             fetchStatus();
+            fetchServicesStatus();
         };
         
         function fetchStatus() {
@@ -489,8 +559,34 @@ node deploy/index.js module --remove demo-module
                 });
         }
         
+        function fetchServicesStatus() {
+            fetch('/api/demo/services')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const hs = data.data.happyService;
+                        const ms = data.data.messageStore;
+                        document.getElementById('servicesStatus').innerHTML = 
+                            `<span style="color: ${hs.available ? 'var(--success-color)' : 'var(--error-color)'}">` +
+                            `● HappyService: ${hs.available ? '可用' : '不可用'}</span> | ` +
+                            `<span style="color: ${ms.available ? 'var(--success-color)' : 'var(--error-color)'}">` +
+                            `● MessageStore: ${ms.available ? '可用' : '不可用'}</span>`;
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('servicesStatus').innerHTML = 
+                        '<span style="color: var(--error-color)">无法获取服务状态</span>';
+                });
+        }
+        
         function showResult(data) {
             const box = document.getElementById('resultBox');
+            box.textContent = JSON.stringify(data, null, 2);
+            box.classList.add('show');
+        }
+        
+        function showServicesResult(data) {
+            const box = document.getElementById('servicesResultBox');
             box.textContent = JSON.stringify(data, null, 2);
             box.classList.add('show');
         }
@@ -518,6 +614,28 @@ node deploy/index.js module --remove demo-module
                 .then(res => res.json())
                 .then(showResult)
                 .catch(err => showResult({ error: err.message }));
+        }
+        
+        // 核心服务测试函数
+        function testServices() {
+            fetch('/api/demo/services')
+                .then(res => res.json())
+                .then(showServicesResult)
+                .catch(err => showServicesResult({ error: err.message }));
+        }
+        
+        function testMessages() {
+            fetch('/api/demo/messages?limit=10')
+                .then(res => res.json())
+                .then(showServicesResult)
+                .catch(err => showServicesResult({ error: err.message }));
+        }
+        
+        function testRecent() {
+            fetch('/api/demo/recent')
+                .then(res => res.json())
+                .then(showServicesResult)
+                .catch(err => showServicesResult({ error: err.message }));
         }
     </script>
 </body>

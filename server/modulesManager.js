@@ -17,6 +17,78 @@ const {
     ensureDir
 } = require('./utils/userDataDir');
 
+// ============================================================
+// 核心服务注册表
+// ============================================================
+
+/**
+ * 核心服务注册表
+ * 集中管理所有可注入到模块的核心服务
+ * 使用 getter 实现懒加载，避免循环依赖
+ */
+const coreServices = {
+    /**
+     * HappyService - AI 通信核心（单例）
+     * 用于发送消息、监听 AI 响应、管理会话等
+     */
+    get HappyService() {
+        return require('../lib/happy-service');
+    },
+    
+    /**
+     * MessageStore - 消息持久化存储（单例）
+     * 用于存储和读取消息历史
+     */
+    get MessageStore() {
+        return require('../lib/message-store');
+    },
+    
+    /**
+     * MemoryManager - 记忆管理器（类）
+     * 注意：这是一个类，需要实例化后使用
+     * 实例化时需要传入 dataDir 参数
+     */
+    get MemoryManager() {
+        return require('../lib/memory-manager');
+    },
+    
+    /**
+     * userSettings - 用户设置（需要在 local-service 中初始化）
+     * 可能未初始化，使用时需检查
+     */
+    get userSettings() {
+        try {
+            return require('../lib/local-service/user-settings-cli');
+        } catch (e) {
+            logger.warn('userSettings 加载失败:', e.message);
+            return null;
+        }
+    },
+    
+    /**
+     * secureSettings - 安全设置（需要在 local-service 中初始化）
+     * 可能未初始化，使用时需检查
+     */
+    get secureSettings() {
+        try {
+            return require('../lib/local-service/secure-settings-cli');
+        } catch (e) {
+            logger.warn('secureSettings 加载失败:', e.message);
+            return null;
+        }
+    }
+};
+
+/**
+ * 获取核心服务注册表
+ * @returns {Object} 核心服务对象
+ */
+function getCoreServices() {
+    return coreServices;
+}
+
+// ============================================================
+
 // 存储已加载的模块实例
 let moduleInstances = {};
 
@@ -210,6 +282,18 @@ function initModules(config, options = {}) {
     // 保存运行时选项
     runtimeOptions = options;
     
+    // 构建增强的 runtimeContext，注入核心服务
+    const enhancedRuntimeContext = {
+        ...options.runtimeContext,
+        // 注入核心服务注册表，模块可通过 runtimeContext.services.XXX 访问
+        services: getCoreServices()
+    };
+    
+    // 保存增强后的 runtimeContext（用于热加载）
+    options.runtimeContext = enhancedRuntimeContext;
+    
+    logger.info('已注入核心服务到 runtimeContext:', Object.keys(coreServices).join(', '));
+    
     const enabledModules = getEnabledModules(config);
     
     for (const moduleConfig of enabledModules) {
@@ -232,11 +316,12 @@ function initModules(config, options = {}) {
                 continue;
             }
             
-            // 生成初始化参数（支持 runtimeContext）
+            // 生成初始化参数（使用增强的 runtimeContext）
             let moduleOptions = {};
             if (typeof moduleConfig.getOptions === 'function') {
                 // getOptions 可以接收 config 和 runtimeContext 两个参数
-                moduleOptions = moduleConfig.getOptions(config, options.runtimeContext);
+                // runtimeContext.services 包含所有核心服务
+                moduleOptions = moduleConfig.getOptions(config, enhancedRuntimeContext);
             }
             
             // 创建模块实例
@@ -613,5 +698,7 @@ module.exports = {
     loadSingleModule,
     unloadSingleModule,
     reloadModule,
-    getModulesStatus
+    getModulesStatus,
+    // 核心服务 API
+    getCoreServices
 };

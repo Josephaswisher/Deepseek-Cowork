@@ -7,6 +7,7 @@
  * - 静态页面服务（介绍自定义模块功能）
  * - API 接口示例（状态查询、Echo）
  * - 标准模块生命周期实现
+ * - 核心服务调用演示（HappyService、MessageStore）
  */
 
 const { EventEmitter } = require('events');
@@ -16,19 +17,32 @@ const fs = require('fs');
 /**
  * 创建演示模块服务实例
  * @param {Object} options - 配置选项
+ * @param {Object} [options.HappyService] - AI 通信服务（通过 modulesManager 注入）
+ * @param {Object} [options.MessageStore] - 消息存储服务（通过 modulesManager 注入）
  * @returns {DemoModuleService} 服务实例
  */
 function setupDemoModuleService(options = {}) {
+    // 获取注入的核心服务
+    const HappyService = options.HappyService || null;
+    const MessageStore = options.MessageStore || null;
     
     class DemoModuleService extends EventEmitter {
         constructor() {
             super();
             this.name = 'demo-module';
-            this.version = '1.0.0';
+            this.version = '2.0.0';
             this.isRunning = false;
             this.startTime = null;
             this.requestCount = 0;
             this.staticDir = path.join(__dirname, 'static');
+            
+            // 保存核心服务引用
+            this.happyService = HappyService;
+            this.messageStore = MessageStore;
+            
+            // 缓存收到的消息（用于演示事件监听）
+            this.recentMessages = [];
+            this.maxRecentMessages = 10;
         }
         
         /**
@@ -42,7 +56,64 @@ function setupDemoModuleService(options = {}) {
                 console.warn(`[DemoModule] 静态目录不存在: ${this.staticDir}`);
             }
             
+            // 检查核心服务是否可用
+            if (this.happyService) {
+                console.log(`[DemoModule] HappyService 已注入，可用于 AI 通信`);
+                
+                // 演示：监听 HappyService 事件
+                this._setupHappyServiceListeners();
+            } else {
+                console.warn(`[DemoModule] HappyService 未注入，AI 功能不可用`);
+            }
+            
+            if (this.messageStore) {
+                console.log(`[DemoModule] MessageStore 已注入，可用于消息持久化`);
+            } else {
+                console.warn(`[DemoModule] MessageStore 未注入，消息持久化功能不可用`);
+            }
+            
             console.log(`[DemoModule] 初始化完成`);
+        }
+        
+        /**
+         * 设置 HappyService 事件监听
+         * 演示如何监听核心服务的事件
+         */
+        _setupHappyServiceListeners() {
+            if (!this.happyService) return;
+            
+            // 监听新消息事件
+            this.happyService.on('happy:message', (message) => {
+                console.log(`[DemoModule] 收到消息: ${message.role} - ${message.content?.substring(0, 50)}...`);
+                
+                // 缓存最近的消息
+                this.recentMessages.push({
+                    timestamp: new Date().toISOString(),
+                    role: message.role,
+                    contentPreview: message.content?.substring(0, 100) || ''
+                });
+                
+                // 保持缓存大小
+                if (this.recentMessages.length > this.maxRecentMessages) {
+                    this.recentMessages.shift();
+                }
+                
+                // 发射自定义事件
+                this.emit('demo:messageReceived', { message });
+            });
+            
+            // 监听连接状态事件
+            this.happyService.on('happy:connected', () => {
+                console.log(`[DemoModule] HappyService 已连接`);
+                this.emit('demo:connected');
+            });
+            
+            this.happyService.on('happy:disconnected', () => {
+                console.log(`[DemoModule] HappyService 已断开`);
+                this.emit('demo:disconnected');
+            });
+            
+            console.log(`[DemoModule] 已设置 HappyService 事件监听`);
         }
         
         /**
@@ -73,7 +144,12 @@ function setupDemoModuleService(options = {}) {
                         isRunning: this.isRunning,
                         uptime: this.getUptime(),
                         requestCount: this.requestCount,
-                        startTime: this.startTime ? this.startTime.toISOString() : null
+                        startTime: this.startTime ? this.startTime.toISOString() : null,
+                        // 核心服务可用性
+                        coreServices: {
+                            happyService: !!this.happyService,
+                            messageStore: !!this.messageStore
+                        }
                     }
                 });
             });
@@ -102,22 +178,157 @@ function setupDemoModuleService(options = {}) {
                     data: {
                         name: this.name,
                         version: this.version,
-                        description: '演示模块 - 展示自定义模块的完整功能',
+                        description: '演示模块 - 展示自定义模块的完整功能和核心服务集成',
                         author: 'deepseek-cowork',
                         features: [
                             '静态页面服务',
                             'RESTful API 接口',
                             '标准模块生命周期',
-                            '事件驱动架构'
+                            '事件驱动架构',
+                            '核心服务集成（HappyService、MessageStore）'
                         ],
                         endpoints: [
                             { method: 'GET', path: '/demo/', description: '介绍页面' },
                             { method: 'GET', path: '/api/demo/status', description: '状态查询' },
                             { method: 'POST', path: '/api/demo/echo', description: 'Echo 请求体' },
-                            { method: 'GET', path: '/api/demo/info', description: '模块信息' }
-                        ]
+                            { method: 'GET', path: '/api/demo/info', description: '模块信息' },
+                            { method: 'GET', path: '/api/demo/services', description: '核心服务状态' },
+                            { method: 'GET', path: '/api/demo/messages', description: '获取消息历史（通过 MessageStore）' },
+                            { method: 'GET', path: '/api/demo/recent', description: '最近收到的消息（事件监听演示）' },
+                            { method: 'POST', path: '/api/demo/send', description: '发送消息到 AI（通过 HappyService）' }
+                        ],
+                        coreServices: {
+                            happyService: !!this.happyService,
+                            messageStore: !!this.messageStore
+                        }
                     }
                 });
+            });
+            
+            // ============================================================
+            // 核心服务调用演示 API
+            // ============================================================
+            
+            // API: 核心服务状态
+            app.get('/api/demo/services', (req, res) => {
+                this.requestCount++;
+                
+                const servicesStatus = {
+                    happyService: {
+                        available: !!this.happyService,
+                        status: null
+                    },
+                    messageStore: {
+                        available: !!this.messageStore,
+                        status: null
+                    }
+                };
+                
+                // 获取 HappyService 状态
+                if (this.happyService && typeof this.happyService.getStatus === 'function') {
+                    try {
+                        servicesStatus.happyService.status = this.happyService.getStatus();
+                    } catch (e) {
+                        servicesStatus.happyService.error = e.message;
+                    }
+                }
+                
+                res.json({
+                    success: true,
+                    data: servicesStatus
+                });
+            });
+            
+            // API: 获取消息历史（演示 MessageStore 调用）
+            app.get('/api/demo/messages', (req, res) => {
+                this.requestCount++;
+                const { sessionId, limit = 20 } = req.query;
+                
+                if (!this.messageStore) {
+                    return res.status(503).json({
+                        success: false,
+                        error: 'MessageStore 服务不可用'
+                    });
+                }
+                
+                try {
+                    // 演示：调用 MessageStore.getMessages()
+                    const messages = this.messageStore.getMessages(sessionId);
+                    const limitedMessages = messages ? messages.slice(-parseInt(limit)) : [];
+                    
+                    res.json({
+                        success: true,
+                        data: {
+                            sessionId: sessionId || 'default',
+                            total: messages?.length || 0,
+                            returned: limitedMessages.length,
+                            messages: limitedMessages
+                        }
+                    });
+                } catch (error) {
+                    res.status(500).json({
+                        success: false,
+                        error: error.message
+                    });
+                }
+            });
+            
+            // API: 获取最近收到的消息（演示事件监听）
+            app.get('/api/demo/recent', (req, res) => {
+                this.requestCount++;
+                
+                res.json({
+                    success: true,
+                    data: {
+                        description: '通过监听 HappyService 的 happy:message 事件收集的最近消息',
+                        happyServiceAvailable: !!this.happyService,
+                        count: this.recentMessages.length,
+                        messages: this.recentMessages
+                    }
+                });
+            });
+            
+            // API: 发送消息到 AI（演示 HappyService 调用）
+            app.post('/api/demo/send', async (req, res) => {
+                this.requestCount++;
+                const { message } = req.body;
+                
+                if (!message) {
+                    return res.status(400).json({
+                        success: false,
+                        error: '缺少 message 参数'
+                    });
+                }
+                
+                if (!this.happyService) {
+                    return res.status(503).json({
+                        success: false,
+                        error: 'HappyService 服务不可用'
+                    });
+                }
+                
+                try {
+                    console.log(`[DemoModule] 发送消息到 AI: ${message.substring(0, 50)}...`);
+                    
+                    // 演示：调用 HappyService.sendMessage()
+                    // 注意：这是异步的，会触发流式响应
+                    const result = await this.happyService.sendMessage(message);
+                    
+                    res.json({
+                        success: true,
+                        data: {
+                            messageSent: message,
+                            result: result,
+                            note: '消息已发送，响应将通过 happy:message 事件流式返回'
+                        }
+                    });
+                } catch (error) {
+                    console.error(`[DemoModule] 发送消息失败:`, error);
+                    res.status(500).json({
+                        success: false,
+                        error: error.message
+                    });
+                }
             });
             
             console.log(`[DemoModule] 已注册路由: /demo/, /api/demo/*`);

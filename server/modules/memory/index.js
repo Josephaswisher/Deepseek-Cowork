@@ -15,11 +15,14 @@ const { EventEmitter } = require('events');
  * @param {Object} [options.memoryManager] MemoryManager 实例（可选，优先使用）
  * @param {string} [options.dataDir] 记忆数据目录（可选，用于自动创建 MemoryManager）
  * @param {Object} [options.serverConfig] 服务器配置
+ * @param {Object} [options.MemoryManager] MemoryManager 类（通过 modulesManager 注入）
+ * @param {Object} [options.MessageStore] MessageStore 单例（通过 modulesManager 注入）
  * @returns {MemoryService} Memory service instance
  */
 function setupMemoryService(options = {}) {
-  // 获取 MessageStore 单例
-  const MessageStore = require('../../../lib/message-store');
+  // 优先使用注入的服务，否则回退到 require（向后兼容）
+  const MessageStore = options.MessageStore || require('../../../lib/message-store');
+  const MemoryManagerClass = options.MemoryManager || null;
   
   /**
    * Memory Service class
@@ -31,6 +34,8 @@ function setupMemoryService(options = {}) {
       this.dataDir = options.dataDir || null;
       this.config = options.serverConfig || {};
       this.isRunning = false;
+      // 保存注入的 MemoryManager 类（用于延迟实例化）
+      this._MemoryManagerClass = MemoryManagerClass;
     }
 
     /**
@@ -52,7 +57,9 @@ function setupMemoryService(options = {}) {
         // 如果没有外部注入的 memoryManager，且提供了 dataDir，则自动创建
         if (!this.memoryManager && this.dataDir) {
           console.log('[MemoryService] Creating MemoryManager with dataDir:', this.dataDir);
-          const MemoryManager = require('../../../lib/memory-manager');
+          
+          // 优先使用注入的 MemoryManager 类，否则回退到 require（向后兼容）
+          const MemoryManager = this._MemoryManagerClass || require('../../../lib/memory-manager');
           this.memoryManager = new MemoryManager({ dataDir: this.dataDir });
           await this.memoryManager.initialize();
           console.log('[MemoryService] MemoryManager created and initialized');

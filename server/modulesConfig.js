@@ -127,12 +127,19 @@ const modules = [
             // 使用 runtimeContext 中的 memoriesDir，如果没有则使用默认值
             const memoriesDir = runtimeContext?.memoriesDir || path.join(getUserDataDir(), 'memories');
             
+            // 从 runtimeContext.services 获取核心服务
+            const services = runtimeContext?.services || {};
+            
             return {
                 serverConfig: {
                     host: config.server.host,
                     port: config.server.port
                 },
-                dataDir: memoriesDir
+                dataDir: memoriesDir,
+                // 注入核心服务（通过 runtimeContext.services 获取）
+                // 模块内部可直接使用，无需再 require
+                MemoryManager: services.MemoryManager,
+                MessageStore: services.MessageStore
             };
         },
         
