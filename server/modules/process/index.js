@@ -168,11 +168,6 @@ function setupProcessService(options = {}) {
      * @returns {Object} 返回app实例以支持链式调用
      */
     setupRoutes(app) {
-      // 如果通过options传入了io实例，设置WebSocket支持
-      if (this.io) {
-        this.setupSocketIO(this.io);
-      }
-
       // 服务状态路由
       app.get('/api/process/status', (req, res) => {
         try {

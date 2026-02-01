@@ -15,6 +15,7 @@ const http = require('http');
 const net = require('net');
 const { exec } = require('child_process');
 const express = require('express');
+const { Server } = require('socket.io');
 const { app } = require('electron');
 
 /**
@@ -35,6 +36,7 @@ class ServerManager {
     this.memoryService = null;         // 记忆管理服务实例
     this.expressApp = null;            // Express 应用
     this.httpServer = null;            // HTTP 服务器实例
+    this.io = null;                    // Socket.IO 实例
     
     this.isRunning = false;
     this.logs = [];
@@ -507,22 +509,38 @@ class ServerManager {
       // 6. Start HTTP server first
       await this.startHttpServer();
       
-      // 7. 启动所有模块
+      // 7. 创建 Socket.IO 实例
+      this.io = new Server(this.httpServer, {
+        cors: {
+          origin: '*',
+          methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+          credentials: true
+        },
+        transports: ['websocket', 'polling'],
+        allowUpgrades: true,
+        pingTimeout: 60000,
+        pingInterval: 25000
+      });
+      this.addLog('info', `Socket.IO enabled on http://${this.config.host}:${this.config.port}/socket.io/`);
+      
+      // 8. 启动所有模块
       this.addLog('info', 'Starting all modules...');
       await modulesManager.bootstrapModules({
         app: this.expressApp,
+        io: this.io,
+        http: this.httpServer,
         config: moduleConfig
       });
       
-      // 8. 获取服务实例引用（保持兼容性）
+      // 9. 获取服务实例引用（保持兼容性）
       this.browserControlServer = modulesManager.getModule('browser');
       this.explorerService = modulesManager.getModule('explorer');
       this.memoryService = modulesManager.getModule('memory');
       
-      // 9. Setup server event bridge
+      // 10. Setup server event bridge
       this.setupEventBridge();
       
-      // 10. Setup explorer and memory event forwarding
+      // 11. Setup explorer and memory event forwarding
       this._setupModuleEventForwarding();
       
       this.isRunning = true;
@@ -985,7 +1003,13 @@ class ServerManager {
     this.explorerService = null;
     this.memoryService = null;
     
-    // 2. Close HTTP server
+    // 2. Close Socket.IO
+    if (this.io) {
+      this.io.close();
+      this.io = null;
+    }
+    
+    // 4. Close HTTP server
     if (this.httpServer) {
       await new Promise((resolve) => {
         this.httpServer.close((err) => {
@@ -998,7 +1022,7 @@ class ServerManager {
       this.httpServer = null;
     }
     
-    // 3. Clean up Express app
+    // 5. Clean up Express app
     this.expressApp = null;
   }
 
