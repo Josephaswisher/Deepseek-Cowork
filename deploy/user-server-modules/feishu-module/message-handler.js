@@ -5,8 +5,8 @@
  * - 解析飞书消息内容
  * - 权限检查（私聊/群聊策略）
  * - @提及检测
- * - 与 HappyService 集成
- * - 管理会话和响应
+ * - 通过 Channel Bridge 与 AI 集成
+ * - 管理会话历史
  */
 
 const { EventEmitter } = require('events');
@@ -18,29 +18,25 @@ class MessageHandler extends EventEmitter {
     /**
      * @param {Object} options - 配置选项
      * @param {Object} options.config - 飞书配置
-     * @param {Object} options.happyService - HappyService 实例
      * @param {Object} options.messageStore - MessageStore 实例
      * @param {Object} options.sender - Sender 实例
      * @param {Object} options.policy - Policy 实例
-     * @param {Map} options.pendingResponses - 等待响应的映射
      * @param {Map} options.chatHistories - 会话历史映射
+     * @param {Object} options.adapter - Channel Adapter 实例
+     * @param {Object} options.channelBridge - Channel Bridge 实例
      */
     constructor(options = {}) {
         super();
         
         this.config = options.config || {};
-        this.happyService = options.happyService;
         this.messageStore = options.messageStore;
         this.sender = options.sender;
         this.policy = options.policy;
-        this.pendingResponses = options.pendingResponses || new Map();
         this.chatHistories = options.chatHistories || new Map();
         
-        // 响应缓冲（用于流式响应聚合）
-        this.responseBuffers = new Map();
-        
-        // 响应超时（毫秒）
-        this.responseTimeout = 60000; // 60 秒
+        // Channel Bridge 集成
+        this.adapter = options.adapter;
+        this.channelBridge = options.channelBridge;
     }
     
     /**
@@ -66,7 +62,7 @@ class MessageHandler extends EventEmitter {
             return;
         }
         
-        // 发送到 AI
+        // 通过 Channel Bridge 发送到 AI
         await this._sendToAI(context);
     }
     
@@ -237,12 +233,20 @@ class MessageHandler extends EventEmitter {
     }
     
     /**
-     * 发送消息到 AI
+     * 发送消息到 AI（通过 Channel Bridge）
      * @param {Object} context - 消息上下文
      */
     async _sendToAI(context) {
-        if (!this.happyService) {
-            console.error('[MessageHandler] HappyService not initialized');
+        // 检查 Channel Bridge 是否可用
+        if (!this.channelBridge) {
+            console.error('[MessageHandler] Channel Bridge not available');
+            await this._sendErrorMessage(context, 'AI 服务暂不可用');
+            return;
+        }
+        
+        if (!this.adapter) {
+            console.error('[MessageHandler] Adapter not available');
+            await this._sendErrorMessage(context, 'AI 服务配置错误');
             return;
         }
         
@@ -263,43 +267,42 @@ class MessageHandler extends EventEmitter {
             }
         }
         
-        // 注册响应回调
-        const responseId = `${context.sessionId}:${context.messageId}`;
-        this.pendingResponses.set(responseId, {
-            context,
-            timestamp: Date.now(),
-            responseBuffer: ''
-        });
-        
-        // 设置响应超时
-        setTimeout(() => {
-            if (this.pendingResponses.has(responseId)) {
-                console.warn(`[MessageHandler] Response timeout: ${responseId}`);
-                this.pendingResponses.delete(responseId);
-            }
-        }, this.responseTimeout);
-        
         try {
-            console.log(`[MessageHandler] Sending to AI: ${messageBody.substring(0, 100)}...`);
+            console.log(`[MessageHandler] Sending to AI via Bridge: ${messageBody.substring(0, 100)}...`);
             
-            // 调用 HappyService 发送消息
-            // 注意：实际的响应通过 happy:message 事件返回
-            if (typeof this.happyService.sendMessage === 'function') {
-                await this.happyService.sendMessage(messageBody, {
-                    sessionId: context.sessionId,
-                    metadata: {
-                        source: 'feishu',
-                        chatId: context.chatId,
-                        messageId: context.messageId,
-                        responseId
-                    }
-                });
-            } else {
-                // 如果 sendMessage 不可用，尝试其他方法
-                console.warn('[MessageHandler] HappyService.sendMessage not available');
+            // 构建 Channel Bridge 上下文
+            const bridgeContext = {
+                channelId: 'feishu',
+                sessionKey: context.sessionId,
+                messageId: context.messageId,
+                senderId: context.senderOpenId,
+                chatType: context.isGroup ? 'group' : 'dm',
+                chatId: context.chatId,
+                content: messageBody,
+                replyToId: context.messageId, // 回复原消息
+                timestamp: context.timestamp,
+                metadata: {
+                    rawContent: context.rawContent,
+                    mentionedBot: context.mentionedBot
+                }
+            };
+            
+            // 通过 Channel Bridge 处理消息
+            const result = await this.channelBridge.handleInbound(bridgeContext, this.adapter);
+            
+            if (!result.success) {
+                console.error(`[MessageHandler] Bridge handleInbound failed: ${result.error}`);
+                
+                // 如果是队列满的情况，已经在 inbound 中发送了提示
+                if (!result.error?.includes('full')) {
+                    await this._sendErrorMessage(context, result.error || '处理消息时发生错误');
+                }
+                return;
             }
             
-            // 保存消息到 MessageStore
+            console.log(`[MessageHandler] Message queued: ${result.requestId}, position: ${result.queuePosition}`);
+            
+            // 保存用户消息到 MessageStore
             if (this.messageStore) {
                 try {
                     this.messageStore.addMessage?.(context.sessionId, {
@@ -318,111 +321,30 @@ class MessageHandler extends EventEmitter {
                 }
             }
             
+            // 清理群聊历史（消息已发送，清理历史）
+            if (context.isGroup) {
+                this.chatHistories.delete(context.chatId);
+            }
+            
         } catch (error) {
             console.error('[MessageHandler] Failed to send to AI:', error.message);
-            this.pendingResponses.delete(responseId);
-            
-            // 发送错误消息到用户
-            if (this.sender) {
-                try {
-                    await this.sender.replyText(context.messageId, 
-                        `Sorry, an error occurred while processing the message: ${error.message}`);
-                } catch (e) {
-                    console.error('[MessageHandler] Failed to send error message:', e.message);
-                }
-            }
+            await this._sendErrorMessage(context, `处理消息时发生错误: ${error.message}`);
         }
     }
     
     /**
-     * 处理 AI 响应
-     * @param {Object} message - AI 响应消息
+     * 发送错误消息
+     * @param {Object} context - 消息上下文
+     * @param {string} errorMessage - 错误信息
      */
-    async handleAIResponse(message) {
-        // 检查消息元数据中是否包含飞书相关信息
-        const metadata = message.metadata || {};
-        const responseId = metadata.responseId;
+    async _sendErrorMessage(context, errorMessage) {
+        if (!this.sender) return;
         
-        // 如果有明确的 responseId，使用它
-        if (responseId && this.pendingResponses.has(responseId)) {
-            await this._processResponse(responseId, message);
-            return;
-        }
-        
-        // 否则，尝试根据 sessionId 匹配
-        const sessionId = metadata.sessionId || message.sessionId;
-        if (sessionId && sessionId.startsWith('feishu:')) {
-            // 查找匹配的等待响应
-            for (const [id, pending] of this.pendingResponses.entries()) {
-                if (pending.context.sessionId === sessionId) {
-                    await this._processResponse(id, message);
-                    return;
-                }
-            }
-        }
-        
-        // 没有匹配的等待响应，可能是主动推送
-        console.log('[MessageHandler] Received AI response with no matching request');
-    }
-    
-    /**
-     * 处理响应
-     * @param {string} responseId - 响应 ID
-     * @param {Object} message - AI 消息
-     */
-    async _processResponse(responseId, message) {
-        const pending = this.pendingResponses.get(responseId);
-        if (!pending) return;
-        
-        const { context } = pending;
-        const content = message.content || '';
-        
-        // 检查是否是流式响应的结束
-        const isComplete = message.done || message.role === 'assistant';
-        
-        if (!isComplete) {
-            // 流式响应，缓冲内容
-            pending.responseBuffer += content;
-            return;
-        }
-        
-        // 响应完成，发送到飞书
-        const finalContent = pending.responseBuffer + content;
-        this.pendingResponses.delete(responseId);
-        
-        if (!finalContent.trim()) {
-            console.warn('[MessageHandler] AI response is empty');
-            return;
-        }
-        
-        console.log(`[MessageHandler] Sending AI response to Feishu: ${finalContent.substring(0, 100)}...`);
-        
-        if (this.sender) {
-            try {
-                await this.sender.replyText(context.messageId, finalContent);
-                
-                // 保存 AI 响应到 MessageStore
-                if (this.messageStore) {
-                    this.messageStore.addMessage?.(context.sessionId, {
-                        role: 'assistant',
-                        content: finalContent,
-                        timestamp: Date.now(),
-                        metadata: {
-                            source: 'feishu',
-                            chatId: context.chatId,
-                            replyToMessageId: context.messageId
-                        }
-                    });
-                }
-                
-                // 清理群聊历史
-                if (context.isGroup) {
-                    this.chatHistories.delete(context.chatId);
-                }
-                
-            } catch (error) {
-                console.error('[MessageHandler] Failed to send response to Feishu:', error.message);
-            }
+        try {
+            await this.sender.replyText(context.messageId, 
+                `抱歉，${errorMessage}`);
+        } catch (e) {
+            console.error('[MessageHandler] Failed to send error message:', e.message);
         }
     }
 }

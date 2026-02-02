@@ -8,7 +8,7 @@
  * - WebSocket/Webhook 连接飞书平台
  * - 私聊和群聊消息处理
  * - 权限策略控制（allowlist、requireMention）
- * - 与 HappyService 集成，实现 AI 对话
+ * - 通过 Channel Bridge 与 AI 集成
  * - 管理页面和 API 接口
  */
 
@@ -18,6 +18,9 @@ const fs = require('fs');
 
 // 导入子模块（将在后续步骤创建）
 let FeishuClient, FeishuMonitor, MessageHandler, Sender, Policy;
+
+// 导入 Channel Bridge 和适配器
+let channelBridge, createFeishuAdapter;
 
 /**
  * 创建飞书模块服务实例
@@ -81,11 +84,12 @@ function setupFeishuModuleService(options = {}) {
             this.sender = null;
             this.policy = null;
             
+            // Channel Bridge 适配器
+            this.feishuAdapter = null;
+            this.bridgeRegistered = false;
+            
             // 会话历史缓存
             this.chatHistories = new Map();
-            
-            // AI 响应回调映射
-            this.pendingResponses = new Map();
         }
         
         /**
@@ -102,7 +106,8 @@ function setupFeishuModuleService(options = {}) {
             // 检查核心服务是否可用
             if (this.happyService) {
                 console.log(`[FeishuModule] HappyService injected, AI communication available`);
-                this._setupHappyServiceListeners();
+                // 初始化 Channel Bridge（如果尚未初始化）
+                this._initChannelBridge();
             } else {
                 console.warn(`[FeishuModule] HappyService not injected, AI features unavailable`);
             }
@@ -121,6 +126,30 @@ function setupFeishuModuleService(options = {}) {
         }
         
         /**
+         * 初始化 Channel Bridge
+         */
+        _initChannelBridge() {
+            try {
+                // 尝试加载 channel-bridge 模块
+                channelBridge = require('../../../lib/channel-bridge');
+                
+                // 检查 bridge 是否已初始化
+                if (!channelBridge.isInitialized()) {
+                    channelBridge.init({
+                        happyService: this.happyService
+                    });
+                    console.log(`[FeishuModule] Channel Bridge initialized`);
+                } else {
+                    console.log(`[FeishuModule] Channel Bridge already initialized`);
+                }
+            } catch (error) {
+                console.warn(`[FeishuModule] Failed to load Channel Bridge: ${error.message}`);
+                console.warn(`[FeishuModule] AI features will be limited`);
+                channelBridge = null;
+            }
+        }
+        
+        /**
          * 加载子模块
          */
         async _loadSubModules() {
@@ -132,19 +161,32 @@ function setupFeishuModuleService(options = {}) {
                 Sender = require('./sender');
                 Policy = require('./policy');
                 
+                // 加载适配器模块
+                const { createFeishuAdapter: createAdapter } = require('./adapter');
+                createFeishuAdapter = createAdapter;
+                
                 // 初始化子模块实例
                 this.policy = new Policy(this.config);
                 this.client = new FeishuClient(this.config);
                 this.sender = new Sender(this.client, this.config);
+                
+                // 创建 Channel Bridge 适配器
+                this.feishuAdapter = createFeishuAdapter(this.sender);
+                console.log(`[FeishuModule] Feishu adapter created`);
+                
+                // 初始化消息处理器（传入适配器）
                 this.messageHandler = new MessageHandler({
                     config: this.config,
-                    happyService: this.happyService,
                     messageStore: this.messageStore,
                     sender: this.sender,
                     policy: this.policy,
-                    pendingResponses: this.pendingResponses,
-                    chatHistories: this.chatHistories
+                    chatHistories: this.chatHistories,
+                    // 传入适配器，用于 bridge 集成
+                    adapter: this.feishuAdapter,
+                    // 传入 bridge 引用
+                    channelBridge: channelBridge
                 });
+                
                 this.monitor = new FeishuMonitor({
                     config: this.config,
                     client: this.client,
@@ -176,42 +218,6 @@ function setupFeishuModuleService(options = {}) {
                 console.log(`[FeishuModule] Config loaded from secureSettings`);
             } catch (error) {
                 console.warn(`[FeishuModule] Failed to load config from secureSettings:`, error.message);
-            }
-        }
-        
-        /**
-         * 设置 HappyService 事件监听
-         */
-        _setupHappyServiceListeners() {
-            if (!this.happyService) return;
-            
-            // 监听 AI 消息响应事件
-            this.happyService.on('happy:message', (message) => {
-                this._handleAIResponse(message);
-            });
-            
-            // 监听连接状态事件
-            this.happyService.on('happy:connected', () => {
-                console.log(`[FeishuModule] HappyService connected`);
-                this.emit('feishu:ai_connected');
-            });
-            
-            this.happyService.on('happy:disconnected', () => {
-                console.log(`[FeishuModule] HappyService disconnected`);
-                this.emit('feishu:ai_disconnected');
-            });
-            
-                console.log(`[FeishuModule] HappyService event listeners setup`);
-        }
-        
-        /**
-         * 处理 AI 响应
-         * @param {Object} message - AI 响应消息
-         */
-        _handleAIResponse(message) {
-            // 检查是否有等待此响应的飞书会话
-            if (this.messageHandler) {
-                this.messageHandler.handleAIResponse(message);
             }
         }
         
@@ -428,6 +434,17 @@ function setupFeishuModuleService(options = {}) {
             this.isRunning = true;
             this.startTime = new Date();
             
+            // 注册到 Channel Bridge
+            if (channelBridge && this.feishuAdapter && !this.bridgeRegistered) {
+                const registered = channelBridge.registerChannel('feishu', this.feishuAdapter);
+                if (registered) {
+                    this.bridgeRegistered = true;
+                    console.log(`[FeishuModule] Registered to Channel Bridge`);
+                } else {
+                    console.warn(`[FeishuModule] Failed to register to Channel Bridge`);
+                }
+            }
+            
             // 检查配置是否完整
             if (!this.config.appId || !this.config.appSecret) {
                 console.warn(`[FeishuModule] Feishu credentials not configured, please configure via /feishu/ page`);
@@ -465,6 +482,13 @@ function setupFeishuModuleService(options = {}) {
         async stop() {
             this.isRunning = false;
             const uptime = this.getUptime();
+            
+            // 从 Channel Bridge 注销
+            if (channelBridge && this.bridgeRegistered) {
+                channelBridge.unregisterChannel('feishu');
+                this.bridgeRegistered = false;
+                console.log(`[FeishuModule] Unregistered from Channel Bridge`);
+            }
             
             // 停止飞书连接
             if (this.monitor) {
