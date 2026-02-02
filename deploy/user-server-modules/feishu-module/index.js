@@ -27,6 +27,7 @@ let channelBridge, createFeishuAdapter;
  * @param {Object} options - 配置选项
  * @param {Object} [options.HappyService] - AI 通信服务（通过 modulesManager 注入）
  * @param {Object} [options.MessageStore] - 消息存储服务（通过 modulesManager 注入）
+ * @param {Object} [options.ChannelBridge] - 通道桥接服务（通过 modulesManager 注入）
  * @param {Object} [options.secureSettings] - 安全设置服务
  * @param {Object} [options.feishuConfig] - 飞书配置
  * @returns {FeishuModuleService} 服务实例
@@ -35,6 +36,7 @@ function setupFeishuModuleService(options = {}) {
     // 获取注入的核心服务
     const HappyService = options.HappyService || null;
     const MessageStore = options.MessageStore || null;
+    const ChannelBridgeService = options.ChannelBridge || null;
     const secureSettings = options.secureSettings || null;
     const feishuConfig = options.feishuConfig || {};
     
@@ -129,23 +131,23 @@ function setupFeishuModuleService(options = {}) {
          * 初始化 Channel Bridge
          */
         _initChannelBridge() {
-            try {
-                // 尝试加载 channel-bridge 模块
-                channelBridge = require('../../../lib/channel-bridge');
-                
-                // 检查 bridge 是否已初始化
-                if (!channelBridge.isInitialized()) {
-                    channelBridge.init({
-                        happyService: this.happyService
-                    });
-                    console.log(`[FeishuModule] Channel Bridge initialized`);
-                } else {
-                    console.log(`[FeishuModule] Channel Bridge already initialized`);
-                }
-            } catch (error) {
-                console.warn(`[FeishuModule] Failed to load Channel Bridge: ${error.message}`);
-                console.warn(`[FeishuModule] AI features will be limited`);
+            // 使用通过 modulesManager 注入的 ChannelBridge
+            if (!ChannelBridgeService) {
+                console.warn(`[FeishuModule] ChannelBridge not injected, AI features unavailable`);
                 channelBridge = null;
+                return;
+            }
+            
+            channelBridge = ChannelBridgeService;
+            
+            // 检查 bridge 是否已初始化
+            if (!channelBridge.isInitialized()) {
+                channelBridge.init({
+                    happyService: this.happyService
+                });
+                console.log(`[FeishuModule] Channel Bridge initialized`);
+            } else {
+                console.log(`[FeishuModule] Channel Bridge ready`);
             }
         }
         

@@ -76,6 +76,18 @@ const coreServices = {
             logger.warn('Failed to load secureSettings:', e.message);
             return null;
         }
+    },
+    
+    /**
+     * ChannelBridge - 通道桥接层（单例）
+     * 作为外部通道与 HappyService AI 核心之间的统一中介
+     * 用于注册通道、处理入站消息、分发 AI 响应
+     * 
+     * 使用前需要调用 init({ happyService }) 初始化
+     * 模块可通过 runtimeContext.services.ChannelBridge 获取
+     */
+    get ChannelBridge() {
+        return require('../lib/channel-bridge');
     }
 };
 

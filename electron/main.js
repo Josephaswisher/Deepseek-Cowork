@@ -2077,6 +2077,17 @@ async function initializeHappyService() {
       console.log('  Daemon:', result.daemon?.running ? 'Running' : 'Not running');
       console.log('  Sessions:', Object.keys(result.sessions || {}).length);
       
+      // 初始化 Channel Bridge（供所有通道模块使用）
+      try {
+        const ChannelBridge = require('../lib/channel-bridge');
+        if (!ChannelBridge.isInitialized()) {
+          ChannelBridge.init({ happyService: HappyService });
+          console.log('Channel Bridge initialized successfully');
+        }
+      } catch (err) {
+        console.warn('Channel Bridge initialization failed:', err.message);
+      }
+      
       // 设置 HappyService 事件转发到渲染进程
       setupHappyServiceEventForwarding();
       

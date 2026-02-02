@@ -44,6 +44,26 @@ function initServices(config) {
 async function bootstrapServices({ app, io, http, config, PORT }) {
     await modulesManager.bootstrapModules({ app, io, http, config, PORT });
     logger.info('All modules started successfully');
+    
+    // 初始化 Channel Bridge（如果 HappyService 可用）
+    // ChannelBridge 是通道桥接层，供所有通道模块（内置或用户）使用
+    try {
+        const coreServices = modulesManager.getCoreServices();
+        const HappyService = coreServices.HappyService;
+        const ChannelBridge = coreServices.ChannelBridge;
+        
+        // 只有当 HappyService 已初始化时才初始化 ChannelBridge
+        if (HappyService && HappyService.isInitialized && HappyService.isInitialized()) {
+            if (ChannelBridge && !ChannelBridge.isInitialized()) {
+                ChannelBridge.init({ happyService: HappyService });
+                logger.info('Channel Bridge initialized successfully');
+            }
+        } else {
+            logger.debug('HappyService not initialized, Channel Bridge deferred');
+        }
+    } catch (err) {
+        logger.warn('Channel Bridge initialization skipped:', err.message);
+    }
 }
 
 module.exports = {

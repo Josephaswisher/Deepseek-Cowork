@@ -62,6 +62,7 @@ module.exports = {
                 // 核心服务
                 HappyService: runtimeContext?.services?.HappyService,
                 MessageStore: runtimeContext?.services?.MessageStore,
+                ChannelBridge: runtimeContext?.services?.ChannelBridge,
                 secureSettings: runtimeContext?.services?.secureSettings,
                 
                 // 飞书配置：优先从 moduleConfigs 读取，兼容旧方式从 config.feishu 读取
