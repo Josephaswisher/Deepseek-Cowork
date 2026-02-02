@@ -333,6 +333,9 @@ function setupFeishuModuleService(options = {}) {
                 try {
                     const newConfig = req.body;
                     
+                    // 记录之前的 enabled 状态
+                    const wasEnabled = this.config.enabled;
+                    
                     // 更新配置
                     const updatableFields = [
                         'enabled', 'appId', 'appSecret', 'domain', 
@@ -380,6 +383,35 @@ function setupFeishuModuleService(options = {}) {
                     // 更新子模块配置
                     if (this.client) this.client.updateConfig(this.config);
                     if (this.policy) this.policy.updateConfig(this.config);
+                    
+                    // 根据 enabled 状态变化启动或停止连接
+                    const isNowEnabled = this.config.enabled;
+                    if (isNowEnabled !== wasEnabled) {
+                        if (isNowEnabled && this.monitor) {
+                            // 启用飞书模块 - 检查凭证并启动连接
+                            if (this.config.appId && this.config.appSecret) {
+                                console.log(`[FeishuModule] Enabled changed to true, starting connection...`);
+                                try {
+                                    await this.monitor.start();
+                                    console.log(`[FeishuModule] Connection started successfully`);
+                                } catch (startError) {
+                                    console.error(`[FeishuModule] Failed to start connection:`, startError.message);
+                                    this.connectionState.lastError = startError.message;
+                                }
+                            } else {
+                                console.warn(`[FeishuModule] Enabled but credentials not configured`);
+                            }
+                        } else if (!isNowEnabled && this.monitor) {
+                            // 禁用飞书模块 - 停止连接
+                            console.log(`[FeishuModule] Enabled changed to false, stopping connection...`);
+                            try {
+                                await this.monitor.stop();
+                                console.log(`[FeishuModule] Connection stopped successfully`);
+                            } catch (stopError) {
+                                console.error(`[FeishuModule] Failed to stop connection:`, stopError.message);
+                            }
+                        }
+                    }
                     
                     res.json({
                         success: true,
