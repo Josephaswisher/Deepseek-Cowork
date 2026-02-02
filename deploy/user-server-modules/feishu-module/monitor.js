@@ -116,9 +116,27 @@ class FeishuMonitor extends EventEmitter {
             this._registerEventHandlers();
             
             // 启动 WebSocket 客户端
+            console.log(`[FeishuMonitor] Starting WSClient...`);
+            console.log(`[FeishuMonitor] WSClient type: ${typeof this._wsClient}`);
+            console.log(`[FeishuMonitor] WSClient keys: ${Object.keys(this._wsClient || {}).join(', ')}`);
+            
             this._wsClient.start({
                 eventDispatcher: this._eventDispatcher
             });
+            
+            // 尝试监听 WSClient 的事件（如果可用）
+            if (this._wsClient.on) {
+                console.log(`[FeishuMonitor] WSClient has 'on' method, setting up listeners...`);
+                this._wsClient.on('error', (err) => {
+                    console.error(`[FeishuMonitor] WSClient error event: ${err.message || err}`);
+                });
+                this._wsClient.on('close', () => {
+                    console.log(`[FeishuMonitor] WSClient close event`);
+                });
+                this._wsClient.on('message', (msg) => {
+                    console.log(`[FeishuMonitor] WSClient raw message event: ${JSON.stringify(msg).substring(0, 200)}...`);
+                });
+            }
             
             this._reconnectAttempts = 0;
             
@@ -150,35 +168,57 @@ class FeishuMonitor extends EventEmitter {
     _registerEventHandlers() {
         if (!this._eventDispatcher) return;
         
+        console.log(`[FeishuMonitor] Registering event handlers...`);
+        console.log(`[FeishuMonitor] EventDispatcher type: ${typeof this._eventDispatcher}`);
+        console.log(`[FeishuMonitor] EventDispatcher.register type: ${typeof this._eventDispatcher.register}`);
+        
         // 消息接收事件
         this._eventDispatcher.register({
             'im.message.receive_v1': async (data) => {
+                console.log(`[FeishuMonitor] >>> Received im.message.receive_v1 event!`);
+                console.log(`[FeishuMonitor] >>> Raw event data type: ${typeof data}`);
+                console.log(`[FeishuMonitor] >>> Message data: ${JSON.stringify(data).substring(0, 500)}...`);
                 try {
                     await this._handleMessageEvent(data);
                 } catch (error) {
                     console.error('[FeishuMonitor] Failed to process message event:', error.message);
+                    console.error('[FeishuMonitor] Error stack:', error.stack);
                 }
             },
             
             // 消息已读事件（忽略）
             'im.message.message_read_v1': async () => {
-                // 忽略已读回执
+                console.log(`[FeishuMonitor] >>> Received im.message.message_read_v1 (ignored)`);
             },
             
             // 机器人被添加到群聊
             'im.chat.member.bot.added_v1': async (data) => {
+                console.log(`[FeishuMonitor] >>> Received im.chat.member.bot.added_v1`);
                 console.log(`[FeishuMonitor] Bot added to chat: ${data?.chat_id || 'unknown'}`);
                 this.emit('bot_added', data);
             },
             
             // 机器人被移出群聊
             'im.chat.member.bot.deleted_v1': async (data) => {
+                console.log(`[FeishuMonitor] >>> Received im.chat.member.bot.deleted_v1`);
                 console.log(`[FeishuMonitor] Bot removed from chat: ${data?.chat_id || 'unknown'}`);
                 this.emit('bot_removed', data);
+            },
+            
+            // 用户进入私聊（调试）
+            'im.chat.access_event.bot_p2p_chat_entered_v1': async (data) => {
+                console.log(`[FeishuMonitor] >>> User entered chat: ${JSON.stringify(data).substring(0, 200)}`);
+            },
+            
+            // 通用事件捕获（用于调试未知事件）
+            '*': async (eventType, data) => {
+                console.log(`[FeishuMonitor] >>> WILDCARD event received: ${eventType}`);
+                console.log(`[FeishuMonitor] >>> WILDCARD data: ${JSON.stringify(data).substring(0, 300)}...`);
             }
         });
         
-        console.log('[FeishuMonitor] Event handlers registered');
+        console.log('[FeishuMonitor] Event handlers registered (with debug logging)');
+        console.log('[FeishuMonitor] Registered events: im.message.receive_v1, im.message.message_read_v1, im.chat.member.bot.added_v1, im.chat.member.bot.deleted_v1, im.chat.access_event.bot_p2p_chat_entered_v1, *');
     }
     
     /**

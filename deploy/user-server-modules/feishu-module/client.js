@@ -88,12 +88,21 @@ class FeishuClient {
         this.checkCredentials();
         
         if (!this._client) {
+            console.log(`[FeishuClient] Creating new Lark.Client...`);
+            console.log(`[FeishuClient]   appId length: ${this.config.appId?.length || 0}`);
+            console.log(`[FeishuClient]   appSecret length: ${this.config.appSecret?.length || 0}`);
+            console.log(`[FeishuClient]   domain: ${this.getDomain()}`);
+            console.log(`[FeishuClient]   Lark.AppType.SelfBuild: ${Lark?.AppType?.SelfBuild}`);
+            
             this._client = new Lark.Client({
                 appId: this.config.appId,
                 appSecret: this.config.appSecret,
                 appType: Lark.AppType.SelfBuild,
                 domain: this.getDomain()
             });
+            
+            console.log(`[FeishuClient] Client created, has im: ${!!this._client?.im}`);
+            console.log(`[FeishuClient] Client keys: ${Object.keys(this._client || {}).join(', ')}`);
         }
         
         return this._client;
@@ -154,29 +163,82 @@ class FeishuClient {
      */
     async probe() {
         try {
+            console.log(`[FeishuClient] probe() called, appId: ${this.config.appId?.substring(0, 4)}...`);
             const client = this.getClient();
             
-            // 获取机器人信息
-            const response = await client.im.bot.get();
+            // 检查客户端结构 - 飞书 SDK bot 信息在 application 下
+            console.log(`[FeishuClient] probe() client type: ${typeof client}`);
+            console.log(`[FeishuClient] probe() client.application: ${typeof client?.application}`);
+            console.log(`[FeishuClient] probe() client.application keys: ${client?.application ? Object.keys(client.application).join(', ') : 'null'}`);
+            
+            // 检查 application.v6 (通常 bot 信息在这里)
+            if (client?.application?.v6) {
+                console.log(`[FeishuClient] probe() client.application.v6 keys: ${Object.keys(client.application.v6).join(', ')}`);
+            }
+            
+            // 尝试多种可能的路径
+            let response;
+            try {
+                // 方法1: application.bot (新版 SDK)
+                if (client?.application?.bot?.get) {
+                    console.log(`[FeishuClient] probe() using client.application.bot.get()`);
+                    response = await client.application.bot.get();
+                } 
+                // 方法2: im.bot (旧版 SDK)
+                else if (client?.im?.bot?.get) {
+                    console.log(`[FeishuClient] probe() using client.im.bot.get()`);
+                    response = await client.im.bot.get();
+                }
+                // 方法3: 使用 request 方法直接调用 API
+                else {
+                    console.log(`[FeishuClient] probe() using direct API call /open-apis/bot/v3/info`);
+                    response = await client.request({
+                        method: 'GET',
+                        url: '/open-apis/bot/v3/info',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                }
+            } catch (apiError) {
+                console.error(`[FeishuClient] probe() API call error: ${apiError.message}`);
+                return {
+                    ok: false,
+                    error: apiError.message
+                };
+            }
+            console.log(`[FeishuClient] probe() response code: ${response.code}, msg: ${response.msg || 'OK'}`);
+            console.log(`[FeishuClient] probe() response.data keys: ${response.data ? Object.keys(response.data).join(', ') : 'null'}`);
+            console.log(`[FeishuClient] probe() full response: ${JSON.stringify(response || {}).substring(0, 800)}`);
             
             if (response.code !== 0) {
+                console.error(`[FeishuClient] probe() failed: ${response.msg || `Error code: ${response.code}`}`);
                 return {
                     ok: false,
                     error: response.msg || `Error code: ${response.code}`
                 };
             }
             
+            // 飞书 API /open-apis/bot/v3/info 返回的数据结构可能有多种：
+            // 1. response.bot (直接在 response 下)
+            // 2. response.data.bot (在 data 下)
+            // 3. response.data (data 本身就是 bot 信息)
+            const botData = response.bot || response.data?.bot || response.data || {};
+            
             this._botInfo = {
                 appId: this.config.appId,
-                botName: response.data?.bot?.app_name || '',
-                botOpenId: response.data?.bot?.open_id || ''
+                botName: botData.app_name || '',
+                botOpenId: botData.open_id || ''
             };
+            
+            console.log(`[FeishuClient] probe() success: botName=${this._botInfo.botName}, botOpenId=${this._botInfo.botOpenId}`);
             
             return {
                 ok: true,
                 ...this._botInfo
             };
         } catch (error) {
+            console.error(`[FeishuClient] probe() exception: ${error.message}`);
             return {
                 ok: false,
                 error: error.message
