@@ -944,6 +944,44 @@ function setupBrowserControlService(options = {}) {
         result.requestId = finalRequestId;
         res.json(result);
       });
+
+      // 按域名获取cookies（直接从浏览器获取，不需要tabId）
+      apiRouter.post('/get_cookies_by_domain', async (req, res) => {
+        const { domain, includeSubdomains = true, requestId, callbackUrl } = req.body;
+        
+        if (!domain) {
+          return res.status(400).json({ 
+            status: 'error', 
+            message: "请求中缺少'domain'参数",
+            needsCallback: false
+          });
+        }
+        
+        if (!this.extensionWebSocketServer) {
+          return res.status(500).json({ 
+            status: 'error', 
+            message: 'WebSocket服务器不可用',
+            needsCallback: false
+          });
+        }
+        
+        const finalRequestId = requestId || uuidv4();
+        
+        if (this.callbackManager) {
+          await this.callbackManager.registerCallback(finalRequestId, callbackUrl || '_internal');
+        }
+        
+        const result = await this.extensionWebSocketServer.sendMessage({
+          type: 'get_cookies_by_domain',
+          domain: domain,
+          includeSubdomains: includeSubdomains,
+          requestId: finalRequestId
+        });
+        
+        result.needsCallback = true;
+        result.requestId = finalRequestId;
+        res.json(result);
+      });
       
       // 保存cookies
       apiRouter.post('/save_cookies', async (req, res) => {
@@ -1065,6 +1103,78 @@ function setupBrowserControlService(options = {}) {
           res.status(500).json({ 
             status: 'error', 
             message: '获取cookies失败',
+            needsCallback: false
+          });
+        }
+      });
+
+      // 按域名获取cookies（从数据库）
+      apiRouter.get('/cookies/domain/:domain', async (req, res) => {
+        const { domain } = req.params;
+        const { includeSubdomains = 'false' } = req.query;
+        
+        if (!domain) {
+          return res.status(400).json({ 
+            status: 'error', 
+            message: "缺少域名参数",
+            needsCallback: false
+          });
+        }
+        
+        if (!this.database) {
+          return res.status(500).json({ 
+            status: 'error', 
+            message: '数据库不可用',
+            needsCallback: false
+          });
+        }
+        
+        try {
+          let query;
+          let params;
+          
+          if (includeSubdomains === 'true') {
+            // 包含子域名
+            query = 'SELECT * FROM cookies WHERE domain LIKE ? OR domain = ? ORDER BY name';
+            params = [`%.${domain}`, domain];
+          } else {
+            // 只匹配精确域名
+            query = 'SELECT * FROM cookies WHERE domain = ? ORDER BY name';
+            params = [domain];
+          }
+          
+          const cookies = await this.database.all(query, params);
+          
+          // 转换为浏览器API格式（移除tabId字段）
+          const formattedCookies = cookies.map(cookie => ({
+            id: cookie.id,
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            secure: Boolean(cookie.secure),
+            httpOnly: Boolean(cookie.http_only),
+            sameSite: cookie.same_site,
+            expirationDate: cookie.expiration_date,
+            session: Boolean(cookie.session),
+            storeId: cookie.store_id,
+            createdAt: cookie.created_at,
+            updatedAt: cookie.updated_at
+          }));
+          
+          res.json({
+            status: 'success',
+            domain: domain,
+            includeSubdomains: includeSubdomains === 'true',
+            cookies: formattedCookies,
+            total: formattedCookies.length,
+            needsCallback: false
+          });
+        } catch (err) {
+          Logger.error(`获取域名cookies失败: ${err.message}`);
+          res.status(500).json({ 
+            status: 'error', 
+            message: '获取域名cookies失败',
             needsCallback: false
           });
         }
