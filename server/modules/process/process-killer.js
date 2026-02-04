@@ -67,39 +67,92 @@ function sleep(ms) {
 
 /**
  * Windows 平台终止进程
+ * 
+ * 重要：在 Windows 上，避免使用 taskkill /T 参数！
+ * /T 会终止整个进程树，可能意外终止父进程（如 dsc daemon）
+ * 
  * @param {number} pid 进程 ID
  * @param {Object} options 选项
  * @returns {Promise<boolean>} 是否成功
  */
 async function terminateWindows(pid, options = {}) {
-  const { force = false, tree = true } = options;
+  const { force = false } = options;
+  // 注意：忽略 tree 参数，在 Windows 上不使用 /T 来避免终止父进程
+  
+  console.log(`[ProcessKiller] terminateWindows called: PID=${pid}, force=${force}, currentPID=${process.pid}, parentPID=${process.ppid}`);
   
   try {
-    // 构建 taskkill 命令
-    // /F: 强制终止
-    // /T: 终止进程树（包括子进程）
-    // /PID: 指定进程 ID
-    const forceFlag = force ? '/F ' : '';
-    const treeFlag = tree ? '/T ' : '';
-    const command = `taskkill ${forceFlag}${treeFlag}/PID ${pid}`;
+    // 安全检查：不能终止自己或父进程
+    if (pid === process.pid) {
+      console.error(`[ProcessKiller] BLOCKED: Attempted to kill current process (PID: ${pid})`);
+      return false;
+    }
+    if (pid === process.ppid) {
+      console.error(`[ProcessKiller] BLOCKED: Attempted to kill parent process (PID: ${pid})`);
+      return false;
+    }
     
-    await execAsync(command, {
-      windowsHide: true,
-      timeout: 5000
-    });
-    
-    return true;
-  } catch (error) {
-    // 如果进程已经不存在，也算成功
-    if (error.message && (
-      error.message.includes('not found') ||
-      error.message.includes('找不到') ||
-      error.message.includes('没有找到')
-    )) {
+    // 检查进程是否存在
+    if (!isProcessAlive(pid)) {
+      console.log(`[ProcessKiller] Process ${pid} is not alive, returning true`);
       return true;
     }
     
-    // 记录错误但不抛出
+    // 方法1：使用 taskkill 命令（不带 /T 参数！）
+    // 这是最安全的方式，只终止指定的进程，不影响父进程
+    const forceFlag = force ? '/F ' : '';
+    const command = `taskkill ${forceFlag}/PID ${pid}`;
+    
+    console.log(`[ProcessKiller] Executing: ${command}`);
+    
+    try {
+      const result = await execAsync(command, {
+        windowsHide: true,
+        timeout: 5000
+      });
+      console.log(`[ProcessKiller] taskkill result:`, result.stdout || 'success');
+      
+      // 等待进程退出
+      await sleep(200);
+      
+      if (!isProcessAlive(pid)) {
+        console.log(`[ProcessKiller] Process ${pid} terminated successfully`);
+        return true;
+      }
+    } catch (e) {
+      console.log(`[ProcessKiller] taskkill error:`, e.message);
+      // taskkill 可能返回错误但进程已被终止
+      if (!isProcessAlive(pid)) {
+        return true;
+      }
+    }
+    
+    // 方法2：如果 taskkill 失败，尝试强制终止
+    if (isProcessAlive(pid)) {
+      console.log(`[ProcessKiller] Process still alive, trying force kill`);
+      try {
+        await execAsync(`taskkill /F /PID ${pid}`, {
+          windowsHide: true,
+          timeout: 5000
+        });
+        
+        await sleep(200);
+      } catch (e) {
+        console.log(`[ProcessKiller] Force kill error:`, e.message);
+      }
+    }
+    
+    // 最终检查
+    const finalResult = !isProcessAlive(pid);
+    console.log(`[ProcessKiller] Final result for PID ${pid}: ${finalResult}`);
+    return finalResult;
+    
+  } catch (error) {
+    // 如果进程已经不存在，也算成功
+    if (!isProcessAlive(pid)) {
+      return true;
+    }
+    
     console.error(`[ProcessKiller] Windows terminate failed for PID ${pid}:`, error.message);
     return false;
   }

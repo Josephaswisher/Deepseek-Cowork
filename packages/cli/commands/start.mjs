@@ -128,7 +128,22 @@ export async function startCommand(options) {
             // 创建后台启动脚本（总是重新创建，确保路径正确）
             createDaemonScript(startScript, PROJECT_ROOT);
             
+            // 创建日志文件用于捕获 daemon 输出
+            const fs = await import('fs');
+            const logDir = config.getDataDir();
+            const logPath = join(logDir, 'daemon.log');
+            
+            // 确保日志目录存在
+            if (!existsSync(logDir)) {
+                fs.mkdirSync(logDir, { recursive: true });
+            }
+            
+            // 打开日志文件
+            const logFile = fs.openSync(logPath, 'a');
+            
             // 启动后台进程
+            // 重要：在 Windows 上，使用 stdio 重定向到文件而不是 'ignore'
+            // 这可以避免当子进程被终止时导致父进程崩溃的问题
             const child = spawn(process.execPath, [
                 '--no-warnings',
                 startScript,
@@ -138,11 +153,14 @@ export async function startCommand(options) {
                 ...(debug ? ['--debug'] : [])
             ], {
                 detached: true,
-                stdio: 'ignore',
+                stdio: ['ignore', logFile, logFile],
                 env: { ...process.env, FORCE_COLOR: '1' }
             });
             
             child.unref();
+            
+            // 关闭父进程持有的日志文件句柄
+            fs.closeSync(logFile);
             
             // 保存 PID
             writePidFile(config.getPidFilePath(), child.pid);

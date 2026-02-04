@@ -1198,17 +1198,12 @@ function setupProcessService(options = {}) {
       this.emit('processCompleted', result);
       this.broadcastProcessStatus();
 
-      if (code === 0) {
-        process.resolve(result);
-      } else {
-        // 错误时也返回结果（包含 stdout/stderr），而不是抛出异常
-        const error = new Error(`进程退出异常，退出码: ${code}, 信号: ${signal}`);
-        error.exitCode = code;
-        error.signal = signal;
-        error.stdout = result.stdout;
-        error.stderr = result.stderr;
-        process.reject(error);
-      }
+      // 无论退出码是否为 0，都 resolve 结果
+      // 这样可以避免未处理的 Promise rejection 导致主进程崩溃
+      // 调用者应该检查 result.exitCode 来判断进程是否成功
+      result.success = code === 0;
+      result.error = code !== 0 ? `进程退出异常，退出码: ${code}, 信号: ${signal}` : null;
+      process.resolve(result);
 
       this._processNextInQueue();
     }
