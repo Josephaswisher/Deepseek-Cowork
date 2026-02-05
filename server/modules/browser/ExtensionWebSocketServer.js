@@ -45,6 +45,14 @@ class ExtensionWebSocketServer {
         // dedupeKey 格式: "operationType:param1:param2"
         this.activeRequests = new Map();
         this.dedupeWindowMs = options.dedupeWindowMs || 5000;  // 5秒内的重复请求会被去重
+        
+        // 心跳机制配置
+        this.heartbeatInterval = options.heartbeatInterval || 30000;  // 心跳检查间隔，默认 30 秒
+        this.heartbeatTimeout = options.heartbeatTimeout || 60000;    // 心跳超时时间，默认 60 秒
+        this.heartbeatTimer = null;  // 心跳定时器
+        
+        // 连接活动追踪超时时间（用于清理长时间不活跃的连接）
+        this.connectionIdleTimeout = options.connectionIdleTimeout || 300000;  // 默认 5 分钟
     }
 
     /**
@@ -356,6 +364,10 @@ class ExtensionWebSocketServer {
         }, this.pendingCleanupIntervalMs);
         
         Logger.info(`PendingResponses cleanup started (interval: ${this.pendingCleanupIntervalMs}ms)`);
+        
+        // 启动心跳机制
+        this.startHeartbeat();
+        Logger.info(`Heartbeat started (interval: ${this.heartbeatInterval}ms, timeout: ${this.heartbeatTimeout}ms)`);
     }
 
     /**
@@ -391,6 +403,80 @@ class ExtensionWebSocketServer {
         }
         
         return cleanedCount;
+    }
+
+    /**
+     * 启动心跳机制
+     * 定期向所有活跃连接发送 ping，检测死连接
+     */
+    startHeartbeat() {
+        if (this.heartbeatTimer) {
+            clearInterval(this.heartbeatTimer);
+        }
+        
+        this.heartbeatTimer = setInterval(() => {
+            this.checkHeartbeat();
+        }, this.heartbeatInterval);
+    }
+
+    /**
+     * 停止心跳机制
+     */
+    stopHeartbeat() {
+        if (this.heartbeatTimer) {
+            clearInterval(this.heartbeatTimer);
+            this.heartbeatTimer = null;
+        }
+    }
+
+    /**
+     * 执行心跳检查
+     * 向所有连接发送 ping，关闭超时未响应的连接
+     */
+    checkHeartbeat() {
+        if (this.isShuttingDown) {
+            return;
+        }
+        
+        const now = Date.now();
+        let pingCount = 0;
+        let closedCount = 0;
+        
+        for (const [clientId, connInfo] of this.activeConnections.entries()) {
+            const socket = connInfo.socket || connInfo;  // 兼容旧格式（直接存 socket）和新格式（存对象）
+            
+            if (socket.readyState !== WebSocket.OPEN) {
+                continue;
+            }
+            
+            // 检查是否超时未收到 pong
+            const lastPong = connInfo.lastPong || connInfo.createdAt || now;
+            const timeSinceLastPong = now - lastPong;
+            
+            if (timeSinceLastPong > this.heartbeatTimeout) {
+                // 连接超时，关闭它
+                Logger.warn(`[Heartbeat] Connection ${clientId} timed out (no pong for ${timeSinceLastPong}ms), closing...`);
+                try {
+                    socket.close(1001, 'Heartbeat timeout');
+                } catch (err) {
+                    Logger.error(`[Heartbeat] Error closing connection ${clientId}: ${err.message}`);
+                }
+                closedCount++;
+                continue;
+            }
+            
+            // 发送 ping
+            try {
+                socket.ping();
+                pingCount++;
+            } catch (err) {
+                Logger.error(`[Heartbeat] Error sending ping to ${clientId}: ${err.message}`);
+            }
+        }
+        
+        if (pingCount > 0 || closedCount > 0) {
+            Logger.debug(`[Heartbeat] Sent ${pingCount} pings, closed ${closedCount} timed out connections`);
+        }
     }
 
     /**
@@ -771,24 +857,60 @@ class ExtensionWebSocketServer {
     async handleExtensionClient(socket, request, sessionId) {
         // 检查扩展客户端连接数限制
         if (this.activeConnections.size >= this.maxClients) {
-            Logger.warning('Maximum extension client connections reached.');
-            socket.close(1013, 'Maximum extension client connections reached.');
-            return;
+            // 达到上限时，先尝试清理一轮死连接
+            Logger.info('Connection limit reached, attempting cleanup before rejecting...');
+            await this.cleanupDisconnectedClients();
+            
+            // 清理后再检查
+            if (this.activeConnections.size >= this.maxClients) {
+                Logger.warning('Maximum extension client connections reached after cleanup.');
+                socket.close(1013, 'Maximum extension client connections reached.');
+                return;
+            }
         }
 
         const clientId = uuidv4();
         const clientAddress = `${request.socket.remoteAddress}:${request.socket.remotePort}`;
+        const now = Date.now();
         
         Logger.info(`Browser extension connected: ${clientAddress} (ID: ${clientId})${sessionId ? ' [authenticated]' : ''}`);
         
         await this.storeClient(clientId, clientAddress, 'extension');
-        this.activeConnections.set(clientId, socket);
+        
+        // 存储连接信息（包含元数据）
+        const connectionInfo = {
+            socket,
+            clientId,
+            clientAddress,
+            clientType: 'extension',
+            sessionId,
+            createdAt: now,
+            lastActivity: now,
+            lastPong: now,  // 初始化为当前时间
+            messageCount: 0
+        };
+        this.activeConnections.set(clientId, connectionInfo);
         
         // 存储 socket 的 sessionId 关联
         socket._sessionId = sessionId;
         socket._clientId = clientId;
 
+        // 监听 pong 响应（用于心跳检测）
+        socket.on('pong', () => {
+            const connInfo = this.activeConnections.get(clientId);
+            if (connInfo) {
+                connInfo.lastPong = Date.now();
+                connInfo.lastActivity = Date.now();
+            }
+        });
+
         socket.on('message', async (message) => {
+            // 更新最后活动时间
+            const connInfo = this.activeConnections.get(clientId);
+            if (connInfo) {
+                connInfo.lastActivity = Date.now();
+                connInfo.messageCount++;
+            }
             await this.handleMessage(message, clientId, sessionId);
         });
 
@@ -796,6 +918,9 @@ class ExtensionWebSocketServer {
             Logger.info(`Browser extension disconnected: ${clientAddress} (ID: ${clientId})`);
             await this.updateClientDisconnected(clientId);
             this.activeConnections.delete(clientId);
+            
+            // 同步清理 authenticatedSockets 中的关联条目
+            this.cleanupAuthenticatedSocket(clientId);
             
             // 记录会话结束
             if (sessionId && this.auditLogger) {
@@ -811,6 +936,9 @@ class ExtensionWebSocketServer {
             Logger.error(`Browser extension error for ${clientId}: ${error.message}`);
             await this.updateClientDisconnected(clientId);
             this.activeConnections.delete(clientId);
+            
+            // 同步清理 authenticatedSockets 中的关联条目
+            this.cleanupAuthenticatedSocket(clientId);
         });
     }
 
@@ -823,17 +951,46 @@ class ExtensionWebSocketServer {
     async handleAutomationClient(socket, request, sessionId) {
         const clientId = uuidv4();
         const clientAddress = `${request.socket.remoteAddress}:${request.socket.remotePort}`;
+        const now = Date.now();
         
         Logger.info(`Automation client connected: ${clientAddress} (ID: ${clientId})${sessionId ? ' [authenticated]' : ''}`);
         
         await this.storeClient(clientId, clientAddress, 'automation_client');
-        this.activeConnections.set(clientId, socket);
+        
+        // 存储连接信息（包含元数据）
+        const connectionInfo = {
+            socket,
+            clientId,
+            clientAddress,
+            clientType: 'automation',
+            sessionId,
+            createdAt: now,
+            lastActivity: now,
+            lastPong: now,  // 初始化为当前时间
+            messageCount: 0
+        };
+        this.activeConnections.set(clientId, connectionInfo);
         
         // 存储 socket 的 sessionId 关联
         socket._sessionId = sessionId;
         socket._clientId = clientId;
 
+        // 监听 pong 响应（用于心跳检测）
+        socket.on('pong', () => {
+            const connInfo = this.activeConnections.get(clientId);
+            if (connInfo) {
+                connInfo.lastPong = Date.now();
+                connInfo.lastActivity = Date.now();
+            }
+        });
+
         socket.on('message', async (message) => {
+            // 更新最后活动时间
+            const connInfo = this.activeConnections.get(clientId);
+            if (connInfo) {
+                connInfo.lastActivity = Date.now();
+                connInfo.messageCount++;
+            }
             await this.handleAutomationMessage(message, clientId, socket, sessionId);
         });
 
@@ -841,6 +998,9 @@ class ExtensionWebSocketServer {
             Logger.info(`Automation client disconnected: ${clientAddress} (ID: ${clientId})`);
             await this.updateClientDisconnected(clientId);
             this.activeConnections.delete(clientId);
+            
+            // 同步清理 authenticatedSockets 中的关联条目
+            this.cleanupAuthenticatedSocket(clientId);
             
             // 记录会话结束
             if (sessionId && this.auditLogger) {
@@ -856,6 +1016,9 @@ class ExtensionWebSocketServer {
             Logger.error(`Automation client error for ${clientId}: ${error.message}`);
             await this.updateClientDisconnected(clientId);
             this.activeConnections.delete(clientId);
+            
+            // 同步清理 authenticatedSockets 中的关联条目
+            this.cleanupAuthenticatedSocket(clientId);
         });
 
         // 发送欢迎消息
@@ -1407,7 +1570,9 @@ class ExtensionWebSocketServer {
      * 向所有automation客户端广播消息
      */
     broadcastToAutomationClients(message) {
-        this.activeConnections.forEach((socket, clientId) => {
+        this.activeConnections.forEach((connInfo, clientId) => {
+            // 兼容旧格式（直接存 socket）和新格式（存对象）
+            const socket = connInfo.socket || connInfo;
             if (socket.readyState === WebSocket.OPEN) {
                 this.sendToAutomationClient(socket, message);
             }
@@ -1427,7 +1592,9 @@ class ExtensionWebSocketServer {
             }
 
             let sentCount = 0;
-            for (const [clientId, socket] of this.activeConnections.entries()) {
+            for (const [clientId, connInfo] of this.activeConnections.entries()) {
+                // 兼容旧格式（直接存 socket）和新格式（存对象）
+                const socket = connInfo.socket || connInfo;
                 if (socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify(message));
                     sentCount++;
@@ -1862,7 +2029,9 @@ class ExtensionWebSocketServer {
             }
 
             let sentCount = 0;
-            for (const [clientId, socket] of this.activeConnections.entries()) {
+            for (const [clientId, connInfo] of this.activeConnections.entries()) {
+                // 兼容旧格式（直接存 socket）和新格式（存对象）
+                const socket = connInfo.socket || connInfo;
                 if (socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify(message));
                     sentCount++;
@@ -1942,7 +2111,55 @@ class ExtensionWebSocketServer {
     }
 
     /**
+     * 清理指定客户端在 authenticatedSockets 中的关联条目
+     * @param {string} clientId 客户端ID
+     */
+    cleanupAuthenticatedSocket(clientId) {
+        for (const [socketId, authInfo] of this.authenticatedSockets.entries()) {
+            if (authInfo.clientId === clientId) {
+                this.authenticatedSockets.delete(socketId);
+                Logger.debug(`Cleaned up authenticated socket for client ${clientId}`);
+                break;
+            }
+        }
+    }
+
+    /**
+     * 清理 pendingAuth 中的过期条目
+     */
+    cleanupPendingAuth() {
+        const now = Date.now();
+        let cleanedCount = 0;
+        
+        for (const [socketId, authInfo] of this.pendingAuth.entries()) {
+            const age = now - (authInfo.createdAt?.getTime() || now);
+            // 如果认证挂起超过 2 分钟，强制清理
+            if (age > 120000) {
+                if (authInfo.timeout) {
+                    clearTimeout(authInfo.timeout);
+                }
+                try {
+                    if (authInfo.socket && authInfo.socket.readyState === WebSocket.OPEN) {
+                        authInfo.socket.close(1008, 'Authentication timeout');
+                    }
+                } catch (err) {
+                    // ignore
+                }
+                this.pendingAuth.delete(socketId);
+                cleanedCount++;
+            }
+        }
+        
+        if (cleanedCount > 0) {
+            Logger.info(`Cleaned up ${cleanedCount} stale pending auth entries`);
+        }
+        
+        return cleanedCount;
+    }
+
+    /**
      * 清理断开连接的客户端
+     * 检查 readyState 和 lastActivity 时间
      */
     async cleanupDisconnectedClients() {
         // 如果正在关闭，跳过清理
@@ -1950,17 +2167,53 @@ class ExtensionWebSocketServer {
             return;
         }
         
+        const now = Date.now();
+        let cleanedCount = 0;
+        
         try {
-            for (const [clientId, socket] of this.activeConnections.entries()) {
+            for (const [clientId, connInfo] of this.activeConnections.entries()) {
+                // 兼容旧格式（直接存 socket）和新格式（存对象）
+                const socket = connInfo.socket || connInfo;
+                const lastActivity = connInfo.lastActivity || now;
+                const idleTime = now - lastActivity;
+                
+                let shouldRemove = false;
+                let reason = '';
+                
+                // 检查 1：socket 状态不是 OPEN
                 if (socket.readyState !== WebSocket.OPEN) {
+                    shouldRemove = true;
+                    reason = `socket state is ${socket.readyState}`;
+                }
+                // 检查 2：连接空闲时间超过阈值
+                else if (idleTime > this.connectionIdleTimeout) {
+                    shouldRemove = true;
+                    reason = `idle for ${idleTime}ms`;
+                    // 主动关闭长时间空闲的连接
+                    try {
+                        socket.close(1000, 'Connection idle timeout');
+                    } catch (err) {
+                        // ignore
+                    }
+                }
+                
+                if (shouldRemove) {
                     this.activeConnections.delete(clientId);
                     await this.updateClientDisconnected(clientId);
-                    Logger.info(`Removed disconnected client ${clientId} from connection map.`);
+                    this.cleanupAuthenticatedSocket(clientId);
+                    cleanedCount++;
+                    Logger.info(`Removed disconnected client ${clientId} from connection map (${reason})`);
                 }
             }
+            
+            // 同时清理 pendingAuth 中的过期条目
+            this.cleanupPendingAuth();
+            
         } catch (err) {
             Logger.error(`Error cleaning up disconnected clients: ${err.message}`);
         }
+        
+        return cleanedCount;
     }
 
     /**
@@ -1987,12 +2240,17 @@ class ExtensionWebSocketServer {
         // 清理 activeRequests
         this.activeRequests.clear();
         
+        // 停止心跳机制
+        this.stopHeartbeat();
+        
         if (this.server) {
             this.server.close();
             this.server = null;
 
-            for (const [clientId, socket] of this.activeConnections.entries()) {
+            for (const [clientId, connInfo] of this.activeConnections.entries()) {
                 try {
+                    // 兼容旧格式（直接存 socket）和新格式（存对象）
+                    const socket = connInfo.socket || connInfo;
                     if (socket.readyState === WebSocket.OPEN) {
                         socket.close(1000, 'Server shutting down');
                     }
@@ -2002,6 +2260,8 @@ class ExtensionWebSocketServer {
             }
             
             this.activeConnections.clear();
+            this.pendingAuth.clear();
+            this.authenticatedSockets.clear();
             Logger.info('WebSocket server stopped.');
         }
     }

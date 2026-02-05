@@ -36,6 +36,69 @@ class CallbackManager extends EventEmitter {
     
     // In-memory tracking for faster access
     this.pendingRequests = new Map();  // requestId -> { createdAt, ttl, operationType }
+    
+    // Schema cache - cached column existence checks to avoid repeated queries
+    this._schemaCache = {
+      callbacksExpiresAt: null,       // null = unknown, true/false = column exists/doesn't exist
+      responsesExpiresAt: null,
+      lastChecked: 0
+    };
+    this._schemaCacheTTL = 60000;     // Re-check schema every 60 seconds
+  }
+
+  /**
+   * Check if a column exists in a table
+   * @param {string} tableName Table name
+   * @param {string} columnName Column name
+   * @returns {Promise<boolean>} Whether the column exists
+   */
+  async columnExists(tableName, columnName) {
+    try {
+      const rows = await this.database.all(
+        `PRAGMA table_info(${tableName})`,
+        []
+      );
+      return rows.some(row => row.name === columnName);
+    } catch (err) {
+      this.logger.error(`Error checking column existence: ${err.message}`);
+      return false;  // Assume column doesn't exist on error
+    }
+  }
+
+  /**
+   * Check if expires_at column exists with caching
+   * @param {string} tableName Table name ('callbacks' or 'callback_responses')
+   * @returns {Promise<boolean>} Whether the column exists
+   */
+  async hasExpiresAtColumn(tableName) {
+    const now = Date.now();
+    const cacheKey = tableName === 'callbacks' ? 'callbacksExpiresAt' : 'responsesExpiresAt';
+    
+    // Check if cache is valid
+    if (this._schemaCache[cacheKey] !== null && 
+        (now - this._schemaCache.lastChecked) < this._schemaCacheTTL) {
+      return this._schemaCache[cacheKey];
+    }
+    
+    // Query and cache result
+    const exists = await this.columnExists(tableName, 'expires_at');
+    this._schemaCache[cacheKey] = exists;
+    this._schemaCache.lastChecked = now;
+    
+    if (!exists) {
+      this.logger.warn(`Column 'expires_at' not found in table '${tableName}', will use fallback cleanup`);
+    }
+    
+    return exists;
+  }
+
+  /**
+   * Invalidate schema cache (call after migrations)
+   */
+  invalidateSchemaCache() {
+    this._schemaCache.callbacksExpiresAt = null;
+    this._schemaCache.responsesExpiresAt = null;
+    this._schemaCache.lastChecked = 0;
   }
 
   /**
@@ -336,12 +399,41 @@ class CallbackManager extends EventEmitter {
    */
   async cleanupExpiredCallbacks() {
     try {
-      const result = await this.database.run(
-        'DELETE FROM callbacks WHERE expires_at < CURRENT_TIMESTAMP'
-      );
+      // Check if expires_at column exists
+      const hasExpiresAt = await this.hasExpiresAtColumn('callbacks');
       
-      this.logger.info(`Cleaned up ${result.changes} expired callback records`);
-      return result.changes;
+      let result;
+      if (hasExpiresAt) {
+        // Use expires_at column if it exists
+        result = await this.database.run(
+          'DELETE FROM callbacks WHERE expires_at < CURRENT_TIMESTAMP'
+        );
+      } else {
+        // Fallback: Check if status column exists
+        const hasStatus = await this.columnExists('callbacks', 'status');
+        
+        if (hasStatus) {
+          // Clean completed/timeout/error records older than retention period
+          result = await this.database.run(
+            `DELETE FROM callbacks 
+             WHERE status IN ('completed', 'timeout', 'error') 
+             AND datetime(created_at, '+' || (? / 1000) || ' seconds') < datetime('now')`,
+            [this.responseRetention]
+          );
+        } else {
+          // Ultimate fallback: just clean old records based on created_at
+          result = await this.database.run(
+            `DELETE FROM callbacks 
+             WHERE datetime(created_at, '+' || (? / 1000) || ' seconds') < datetime('now')`,
+            [this.responseRetention * 2]  // Use 2x retention for safety
+          );
+        }
+      }
+      
+      if (result.changes > 0) {
+        this.logger.info(`Cleaned up ${result.changes} expired callback records`);
+      }
+      return result.changes || 0;
     } catch (err) {
       this.logger.error(`Error cleaning up expired callback records: ${err.message}`);
       return 0;
@@ -452,19 +544,59 @@ class CallbackManager extends EventEmitter {
    */
   async cleanupExpiredResponses() {
     try {
-      // Clean up old callback records (completed/timeout/error older than retention period)
-      const callbackResult = await this.database.run(
-        `DELETE FROM callbacks 
-         WHERE status IN ('completed', 'timeout', 'error') 
-         AND datetime(created_at, '+' || (? / 1000) || ' seconds') < datetime('now')`,
-        [this.responseRetention]
-      );
+      // Clean up old callback records
+      let callbackResult = { changes: 0 };
       
-      // Clean up old response records
-      const responseResult = await this.database.run(
-        `DELETE FROM callback_responses 
-         WHERE expires_at < CURRENT_TIMESTAMP`
-      );
+      // Check if status column exists for more targeted cleanup
+      const hasStatus = await this.columnExists('callbacks', 'status');
+      
+      if (hasStatus) {
+        // Clean completed/timeout/error records older than retention period
+        callbackResult = await this.database.run(
+          `DELETE FROM callbacks 
+           WHERE status IN ('completed', 'timeout', 'error') 
+           AND datetime(created_at, '+' || (? / 1000) || ' seconds') < datetime('now')`,
+          [this.responseRetention]
+        );
+      } else {
+        // Fallback: clean based on created_at only (with longer retention for safety)
+        callbackResult = await this.database.run(
+          `DELETE FROM callbacks 
+           WHERE datetime(created_at, '+' || (? / 1000) || ' seconds') < datetime('now')`,
+          [this.responseRetention * 2]
+        );
+      }
+      
+      // Check if expires_at column exists in callback_responses table
+      const hasExpiresAt = await this.hasExpiresAtColumn('callback_responses');
+      
+      let responseResult = { changes: 0 };
+      if (hasExpiresAt) {
+        // Use expires_at column if it exists
+        responseResult = await this.database.run(
+          `DELETE FROM callback_responses 
+           WHERE expires_at < CURRENT_TIMESTAMP`
+        );
+      } else {
+        // Fallback: use created_at column if it exists, or clean orphaned responses
+        // First check if callback_responses has a created_at column
+        const hasCreatedAt = await this.columnExists('callback_responses', 'created_at');
+        
+        if (hasCreatedAt) {
+          // Clean responses older than retention period using created_at
+          responseResult = await this.database.run(
+            `DELETE FROM callback_responses 
+             WHERE datetime(created_at, '+' || (? / 1000) || ' seconds') < datetime('now')`,
+            [this.responseRetention]
+          );
+        } else {
+          // Final fallback: clean up orphaned responses (responses without matching callbacks)
+          responseResult = await this.database.run(
+            `DELETE FROM callback_responses 
+             WHERE request_id NOT IN (SELECT request_id FROM callbacks)`
+          );
+        }
+      }
       
       const totalCleaned = (callbackResult.changes || 0) + (responseResult.changes || 0);
       

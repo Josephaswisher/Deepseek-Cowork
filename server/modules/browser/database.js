@@ -608,46 +608,175 @@ class Database {
   }
 
   /**
+   * Safely add a column to a table with pre-check
+   * @param {string} tableName Table name
+   * @param {string} columnName Column name
+   * @param {string} columnDef Column definition (e.g., 'TEXT DEFAULT NULL')
+   * @param {string} updateSql Optional SQL to update existing rows after adding column
+   * @returns {Promise<boolean>} Whether the operation was successful
+   */
+  async safeAddColumn(tableName, columnName, columnDef, updateSql = null) {
+    try {
+      // Check if column already exists
+      const tableInfo = this.db.exec(`PRAGMA table_info('${tableName}')`);
+      const existingColumns = new Set();
+      
+      if (tableInfo.length > 0 && tableInfo[0].values) {
+        tableInfo[0].values.forEach(row => existingColumns.add(row[1]));
+      }
+
+      if (existingColumns.has(columnName)) {
+        Logger.debug(`Column '${columnName}' already exists in table '${tableName}'`);
+        return true;
+      }
+
+      // Add the column
+      const alterSql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`;
+      this.db.run(alterSql);
+      this.isDirty = true;
+      Logger.info(`Added column '${columnName}' to table '${tableName}'`);
+
+      // Run update SQL if provided
+      if (updateSql) {
+        try {
+          this.db.run(updateSql);
+          Logger.info(`Updated existing rows in '${tableName}' for column '${columnName}'`);
+        } catch (updateErr) {
+          Logger.warn(`Failed to update existing rows for column '${columnName}': ${updateErr.message}`);
+          // Not fatal - column was added successfully
+        }
+      }
+
+      return true;
+    } catch (err) {
+      if (err.message.includes('duplicate column')) {
+        Logger.debug(`Column '${columnName}' already exists in table '${tableName}' (duplicate error)`);
+        return true;
+      }
+      Logger.error(`Failed to add column '${columnName}' to table '${tableName}': ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Check if a table exists
+   * @param {string} tableName Table name
+   * @returns {Promise<boolean>} Whether the table exists
+   */
+  async tableExists(tableName) {
+    try {
+      const result = await this.get(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        [tableName]
+      );
+      return !!result;
+    } catch (err) {
+      Logger.error(`Error checking table existence: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Get migration status/version
+   * @returns {Promise<Object>} Migration status object
+   */
+  async getMigrationStatus() {
+    const status = {
+      callbacksTable: {
+        exists: false,
+        columns: [],
+        hasExpiresAt: false,
+        hasStatus: false,
+        hasTtlMs: false,
+        hasOperationType: false
+      },
+      callbackResponsesTable: {
+        exists: false,
+        columns: [],
+        hasExpiresAt: false,
+        hasCreatedAt: false
+      }
+    };
+
+    try {
+      // Check callbacks table
+      status.callbacksTable.exists = await this.tableExists('callbacks');
+      if (status.callbacksTable.exists) {
+        const callbacksInfo = this.db.exec("PRAGMA table_info('callbacks')");
+        if (callbacksInfo.length > 0 && callbacksInfo[0].values) {
+          status.callbacksTable.columns = callbacksInfo[0].values.map(row => row[1]);
+          status.callbacksTable.hasExpiresAt = status.callbacksTable.columns.includes('expires_at');
+          status.callbacksTable.hasStatus = status.callbacksTable.columns.includes('status');
+          status.callbacksTable.hasTtlMs = status.callbacksTable.columns.includes('ttl_ms');
+          status.callbacksTable.hasOperationType = status.callbacksTable.columns.includes('operation_type');
+        }
+      }
+
+      // Check callback_responses table
+      status.callbackResponsesTable.exists = await this.tableExists('callback_responses');
+      if (status.callbackResponsesTable.exists) {
+        const responsesInfo = this.db.exec("PRAGMA table_info('callback_responses')");
+        if (responsesInfo.length > 0 && responsesInfo[0].values) {
+          status.callbackResponsesTable.columns = responsesInfo[0].values.map(row => row[1]);
+          status.callbackResponsesTable.hasExpiresAt = status.callbackResponsesTable.columns.includes('expires_at');
+          status.callbackResponsesTable.hasCreatedAt = status.callbackResponsesTable.columns.includes('created_at');
+        }
+      }
+    } catch (err) {
+      Logger.error(`Error getting migration status: ${err.message}`);
+    }
+
+    return status;
+  }
+
+  /**
    * Upgrade callbacks and callback_responses table schema
    * @returns {Promise<void>}
    */
   async upgradeCallbacksTable() {
     try {
-      // Check callbacks table columns
-      const callbacksInfo = this.db.exec("PRAGMA table_info('callbacks')");
-      const existingColumns = new Set();
-      
-      if (callbacksInfo.length > 0 && callbacksInfo[0].values) {
-        callbacksInfo[0].values.forEach(row => existingColumns.add(row[1]));
+      // Get current migration status first
+      const migrationStatus = await this.getMigrationStatus();
+      Logger.info(`Migration status before upgrade: callbacks=${JSON.stringify(migrationStatus.callbacksTable)}, responses=${JSON.stringify(migrationStatus.callbackResponsesTable)}`);
+
+      // Check if callbacks table exists
+      if (!migrationStatus.callbacksTable.exists) {
+        Logger.info('Callbacks table does not exist, will be created by initDb');
+        return;
       }
 
-      // Add missing columns to callbacks table
-      const callbacksNewColumns = [
-        { name: 'status', sql: `ALTER TABLE callbacks ADD COLUMN status TEXT DEFAULT 'pending'` },
-        { name: 'operation_type', sql: `ALTER TABLE callbacks ADD COLUMN operation_type TEXT` },
-        { name: 'ttl_ms', sql: `ALTER TABLE callbacks ADD COLUMN ttl_ms INTEGER DEFAULT 60000` }
+      // Add missing columns to callbacks table using safe method
+      // Note: SQLite ALTER TABLE ADD COLUMN only supports constant default values
+      // So we use NULL or simple defaults, then UPDATE to set computed values
+      const callbacksColumns = [
+        { 
+          name: 'status', 
+          def: `TEXT DEFAULT 'pending'`,
+          update: null
+        },
+        { 
+          name: 'operation_type', 
+          def: `TEXT`,
+          update: null
+        },
+        { 
+          name: 'ttl_ms', 
+          def: `INTEGER DEFAULT 60000`,
+          update: null
+        },
+        { 
+          name: 'expires_at', 
+          def: `TIMESTAMP`,  // No default - SQLite doesn't allow non-constant defaults in ALTER TABLE
+          update: `UPDATE callbacks SET expires_at = DATETIME(COALESCE(created_at, CURRENT_TIMESTAMP), '+1 hour') WHERE expires_at IS NULL`
+        }
       ];
 
-      for (const col of callbacksNewColumns) {
-        if (!existingColumns.has(col.name)) {
-          try {
-            this.db.run(col.sql);
-            this.isDirty = true;
-            Logger.info(`Added column '${col.name}' to callbacks table`);
-          } catch (err) {
-            if (!err.message.includes('duplicate column')) {
-              Logger.warn(`Add column warning: ${err.message}`);
-            }
-          }
-        }
+      for (const col of callbacksColumns) {
+        await this.safeAddColumn('callbacks', col.name, col.def, col.update);
       }
 
-      // Check if callback_responses table exists
-      const callbackResponsesExists = await this.get(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='callback_responses'"
-      );
-
-      if (!callbackResponsesExists) {
+      // Handle callback_responses table
+      if (!migrationStatus.callbackResponsesTable.exists) {
         // Create callback_responses table if it doesn't exist
         Logger.info('Missing callback_responses table detected, creating...');
         try {
@@ -663,37 +792,31 @@ class Database {
           Logger.error(`Failed to create callback_responses table: ${err.message}`);
         }
       } else {
-        // Check callback_responses table columns
-        const responsesInfo = this.db.exec("PRAGMA table_info('callback_responses')");
-        const responseColumns = new Set();
-        
-        if (responsesInfo.length > 0 && responsesInfo[0].values) {
-          responsesInfo[0].values.forEach(row => responseColumns.add(row[1]));
-        }
-
-        // Add expires_at column to callback_responses if missing
-        if (!responseColumns.has('expires_at')) {
-          try {
-            // Use simpler DEFAULT value for ALTER TABLE compatibility
-            this.db.run(`ALTER TABLE callback_responses ADD COLUMN expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
-            this.isDirty = true;
-            Logger.info(`Added column 'expires_at' to callback_responses table`);
-            
-            // Update existing rows to set expires_at based on created_at
-            this.db.run(`UPDATE callback_responses SET expires_at = DATETIME(created_at, '+5 minutes') WHERE expires_at IS NULL`);
-            Logger.info('Updated existing callback_responses records with expires_at values');
-          } catch (err) {
-            if (!err.message.includes('duplicate column')) {
-              Logger.warn(`Add column warning: ${err.message}`);
-            }
+        // Add missing columns to callback_responses table
+        // Note: SQLite ALTER TABLE ADD COLUMN only supports constant default values
+        const responsesColumns = [
+          {
+            name: 'created_at',
+            def: `TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+            update: null
+          },
+          {
+            name: 'expires_at',
+            def: `TIMESTAMP`,  // No default - will be set via UPDATE
+            update: `UPDATE callback_responses SET expires_at = DATETIME(COALESCE(created_at, CURRENT_TIMESTAMP), '+5 minutes') WHERE expires_at IS NULL`
           }
+        ];
+
+        for (const col of responsesColumns) {
+          await this.safeAddColumn('callback_responses', col.name, col.def, col.update);
         }
       }
 
-      // Create new indexes if not exist
+      // Create indexes if not exist (safe operation)
       const indexQueries = [
         `CREATE INDEX IF NOT EXISTS idx_callbacks_status ON callbacks(status)`,
         `CREATE INDEX IF NOT EXISTS idx_callbacks_created ON callbacks(created_at)`,
+        `CREATE INDEX IF NOT EXISTS idx_callbacks_expires ON callbacks(expires_at)`,
         `CREATE INDEX IF NOT EXISTS idx_callback_responses_expires ON callback_responses(expires_at)`
       ];
 
@@ -707,10 +830,14 @@ class Database {
         }
       }
 
+      // Log final migration status
+      const finalStatus = await this.getMigrationStatus();
+      Logger.info(`Migration status after upgrade: callbacks=${JSON.stringify(finalStatus.callbacksTable)}, responses=${JSON.stringify(finalStatus.callbackResponsesTable)}`);
       Logger.info('Callbacks table schema upgrade completed');
     } catch (err) {
       Logger.error(`Callbacks table upgrade error: ${err.message}`);
-      // Don't throw - this is not fatal
+      // Don't throw - this is not fatal, but log details for debugging
+      Logger.error(`Stack trace: ${err.stack}`);
     }
   }
 
