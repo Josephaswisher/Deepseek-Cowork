@@ -520,6 +520,33 @@ class ExtensionWebSocketServer {
     }
 
     /**
+     * 解决 pending response：向发起请求的 automation 客户端回传结果并清理
+     * 用于 extension *_complete 消息处理，将回调结果通过 WS 直接回传给 automation 客户端
+     * @param {string} requestId 请求 ID
+     * @param {Object} responseData 回调结果数据
+     */
+    resolvePendingResponse(requestId, responseData) {
+        const info = this.pendingResponses.get(requestId);
+        if (info) {
+            // 向发起请求的 automation 客户端 WS 回传结果
+            if (info.socket && info.socket.readyState === WebSocket.OPEN) {
+                const operationType = info.operationType || 'unknown';
+                this.sendToAutomationClient(info.socket, {
+                    type: `${operationType}_response`,
+                    requestId,
+                    ...responseData
+                });
+                Logger.debug(`Resolved pending response via WS: ${requestId} (op: ${operationType})`);
+            }
+            // 清理
+            if (info.timeoutId) {
+                clearTimeout(info.timeoutId);
+            }
+            this.pendingResponses.delete(requestId);
+        }
+    }
+
+    /**
      * 处理请求超时
      * @param {string} requestId 请求 ID
      * @param {string} operationType 操作类型
@@ -1580,7 +1607,7 @@ class ExtensionWebSocketServer {
     }
 
     /**
-     * 向浏览器扩展发送消息
+     * 向浏览器扩展发送消息（仅发送给 extension 类型客户端，不发给 automation）
      */
     async sendToExtensions(message) {
         try {
@@ -1592,13 +1619,29 @@ class ExtensionWebSocketServer {
             }
 
             let sentCount = 0;
+            let extensionCount = 0;
             for (const [clientId, connInfo] of this.activeConnections.entries()) {
                 // 兼容旧格式（直接存 socket）和新格式（存对象）
                 const socket = connInfo.socket || connInfo;
+                const clientType = connInfo.clientType || 'extension';
+                
+                // 只发送给 extension 客户端，跳过 automation 客户端（避免回声）
+                if (clientType === 'automation') {
+                    continue;
+                }
+                
+                extensionCount++;
                 if (socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify(message));
                     sentCount++;
                 }
+            }
+
+            if (extensionCount === 0) {
+                return { 
+                    status: 'error', 
+                    message: 'No active browser extension connections (only automation clients found)' 
+                };
             }
 
             return { 
@@ -1752,9 +1795,17 @@ class ExtensionWebSocketServer {
 
             // 根据消息类型处理和转发
             switch (data.type) {
-                case 'open_url_complete':
-                    // 清除 pending response 超时
-                    this.clearPendingResponse(requestId);
+                case 'open_url_complete': {
+                    const openUrlResponse = {
+                        status: 'success',
+                        type: 'open_url_complete',
+                        tabId: data.tabId,
+                        url: data.url,
+                        cookies: data.cookies || [],
+                        requestId
+                    };
+                    // 通过 WS 回传结果给 automation 客户端，并清理 pending
+                    this.resolvePendingResponse(requestId, openUrlResponse);
                     // 清除活动请求（去重）
                     this.clearActiveRequest('open_url', { url: data.url, tabId: data.originalTabId });
                     
@@ -1763,14 +1814,7 @@ class ExtensionWebSocketServer {
                     }
                     
                     if (this.callbackManager) {
-                        await this.callbackManager.postToCallback(requestId, {
-                            status: 'success',
-                            type: 'open_url_complete',
-                            tabId: data.tabId,
-                            url: data.url,
-                            cookies: data.cookies || [],
-                            requestId
-                        });
+                        await this.callbackManager.postToCallback(requestId, openUrlResponse);
                     }
 
                     const isNewTab = data.isNewTab !== undefined ? data.isNewTab : !data.originalTabId;
@@ -1790,6 +1834,7 @@ class ExtensionWebSocketServer {
                         timestamp: new Date().toISOString()
                     });
                     break;
+                }
 
                 case 'tab_html_chunk':
                     if (this.tabsManager) {
@@ -1797,17 +1842,18 @@ class ExtensionWebSocketServer {
                     }
                     break;
 
-                case 'close_tab_complete':
-                    // 清除 pending response 超时
-                    this.clearPendingResponse(requestId);
+                case 'close_tab_complete': {
+                    const closeTabResponse = {
+                        status: 'success',
+                        type: 'close_tab_complete',
+                        tabId: data.tabId,
+                        requestId
+                    };
+                    // 通过 WS 回传结果给 automation 客户端，并清理 pending
+                    this.resolvePendingResponse(requestId, closeTabResponse);
                     
                     if (this.callbackManager) {
-                        await this.callbackManager.postToCallback(requestId, {
-                            status: 'success',
-                            type: 'close_tab_complete',
-                            tabId: data.tabId,
-                            requestId
-                        });
+                        await this.callbackManager.postToCallback(requestId, closeTabResponse);
                     }
 
                     if (this.eventEmitter) {
@@ -1822,10 +1868,19 @@ class ExtensionWebSocketServer {
                         timestamp: new Date().toISOString()
                     });
                     break;
+                }
 
-                case 'tab_html_complete':
-                    // 清除 pending response 超时
-                    this.clearPendingResponse(requestId);
+                case 'tab_html_complete': {
+                    // get_html 的最终响应
+                    const htmlCompleteResponse = {
+                        status: 'success',
+                        type: 'tab_html_complete',
+                        tabId: data.tabId,
+                        html: data.html,
+                        requestId
+                    };
+                    // 通过 WS 回传结果给 automation 客户端，并清理 pending
+                    this.resolvePendingResponse(requestId, htmlCompleteResponse);
                     
                     if (this.tabsManager) {
                         await this.tabsManager.handleTabHtmlComplete(data, requestId);
@@ -1845,21 +1900,23 @@ class ExtensionWebSocketServer {
                         timestamp: new Date().toISOString()
                     });
                     break;
+                }
 
-                case 'execute_script_complete':
-                    // 清除 pending response 超时
-                    this.clearPendingResponse(requestId);
+                case 'execute_script_complete': {
+                    const execScriptResponse = {
+                        status: 'success',
+                        type: 'execute_script_complete',
+                        tabId: data.tabId,
+                        result: data.result,
+                        requestId
+                    };
+                    // 通过 WS 回传结果给 automation 客户端，并清理 pending
+                    this.resolvePendingResponse(requestId, execScriptResponse);
                     // 清除活动请求（去重）- 注意：这里没有原始的 code，所以只清理 tabId 相关的
                     // 实际上脚本执行完成后，activeRequests 会因为超时自动清理
                     
                     if (this.callbackManager) {
-                        await this.callbackManager.postToCallback(requestId, {
-                            status: 'success',
-                            type: 'execute_script_complete',
-                            tabId: data.tabId,
-                            result: data.result,
-                            requestId
-                        });
+                        await this.callbackManager.postToCallback(requestId, execScriptResponse);
                     }
 
                     if (this.eventEmitter) {
@@ -1876,18 +1933,20 @@ class ExtensionWebSocketServer {
                         timestamp: new Date().toISOString()
                     });
                     break;
+                }
 
-                case 'inject_css_complete':
-                    // 清除 pending response 超时
-                    this.clearPendingResponse(requestId);
+                case 'inject_css_complete': {
+                    const injectCssResponse = {
+                        status: 'success',
+                        type: 'inject_css_complete',
+                        tabId: data.tabId,
+                        requestId
+                    };
+                    // 通过 WS 回传结果给 automation 客户端，并清理 pending
+                    this.resolvePendingResponse(requestId, injectCssResponse);
                     
                     if (this.callbackManager) {
-                        await this.callbackManager.postToCallback(requestId, {
-                            status: 'success',
-                            type: 'inject_css_complete',
-                            tabId: data.tabId,
-                            requestId
-                        });
+                        await this.callbackManager.postToCallback(requestId, injectCssResponse);
                     }
 
                     if (this.eventEmitter) {
@@ -1902,11 +1961,9 @@ class ExtensionWebSocketServer {
                         timestamp: new Date().toISOString()
                     });
                     break;
+                }
 
-                case 'get_cookies_complete':
-                    // 清除 pending response 超时
-                    this.clearPendingResponse(requestId);
-                    
+                case 'get_cookies_complete': {
                     Logger.info(`Received get_cookies_complete message: tabId=${data.tabId}, cookies count=${data.cookies ? data.cookies.length : 0}`);
                     
                     let cookieAnalysis = null;
@@ -1915,16 +1972,20 @@ class ExtensionWebSocketServer {
                         Logger.info(`[Cookie分析] 标签页 ${data.tabId} 获取到 ${data.cookies.length} 个cookies`);
                     }
                     
+                    const getCookiesResponse = {
+                        status: 'success',
+                        type: 'get_cookies_complete',
+                        tabId: data.tabId,
+                        url: data.url,
+                        cookies: data.cookies || [],
+                        analysis: cookieAnalysis,
+                        requestId
+                    };
+                    // 通过 WS 回传结果给 automation 客户端，并清理 pending
+                    this.resolvePendingResponse(requestId, getCookiesResponse);
+                    
                     if (this.callbackManager) {
-                        await this.callbackManager.postToCallback(requestId, {
-                            status: 'success',
-                            type: 'get_cookies_complete',
-                            tabId: data.tabId,
-                            url: data.url,
-                            cookies: data.cookies || [],
-                            analysis: cookieAnalysis,
-                            requestId
-                        });
+                        await this.callbackManager.postToCallback(requestId, getCookiesResponse);
                     }
 
                     browserEventEmitter.emitBrowserEvent('cookies_received', {
@@ -1936,23 +1997,25 @@ class ExtensionWebSocketServer {
                         timestamp: new Date().toISOString()
                     });
                     break;
+                }
 
-                case 'upload_file_to_tab_complete':
-                    // 清除 pending response 超时
-                    this.clearPendingResponse(requestId);
-                    
+                case 'upload_file_to_tab_complete': {
                     Logger.info(`Received upload_file_to_tab_complete message: tabId=${data.tabId}, uploaded files=${data.uploadedFiles ? data.uploadedFiles.length : 0}`);
                     
+                    const uploadResponse = {
+                        status: 'success',
+                        type: 'upload_file_to_tab_complete',
+                        tabId: data.tabId,
+                        uploadedFiles: data.uploadedFiles || [],
+                        targetSelector: data.targetSelector,
+                        message: data.message || '文件上传完成',
+                        requestId
+                    };
+                    // 通过 WS 回传结果给 automation 客户端，并清理 pending
+                    this.resolvePendingResponse(requestId, uploadResponse);
+                    
                     if (this.callbackManager) {
-                        await this.callbackManager.postToCallback(requestId, {
-                            status: 'success',
-                            type: 'upload_file_to_tab_complete',
-                            tabId: data.tabId,
-                            uploadedFiles: data.uploadedFiles || [],
-                            targetSelector: data.targetSelector,
-                            message: data.message || '文件上传完成',
-                            requestId
-                        });
+                        await this.callbackManager.postToCallback(requestId, uploadResponse);
                     }
                     
                     if (this.eventEmitter) {
@@ -1970,6 +2033,7 @@ class ExtensionWebSocketServer {
                         timestamp: new Date().toISOString()
                     });
                     break;
+                }
 
                 default:
                     Logger.warning(`Unknown message type from extension ${clientId}: ${data.type}`);
