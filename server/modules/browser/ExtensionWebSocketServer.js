@@ -826,8 +826,9 @@ class ExtensionWebSocketServer {
             // 清理待认证状态
             this.pendingAuth.delete(socketId);
             
-            // 移除认证阶段的消息监听器，重新设置正常的消息处理
-            socket.removeAllListeners('message');
+            // 移除认证阶段的所有监听器（message, close, error），
+            // handleExtensionClient / handleAutomationClient 会重新注册完整的监听器集
+            socket.removeAllListeners();
             
             // 继续正常的连接处理
             if (clientType === 'automation') {
@@ -941,8 +942,13 @@ class ExtensionWebSocketServer {
             await this.handleMessage(message, clientId, sessionId);
         });
 
-        socket.on('close', async () => {
-            Logger.info(`Browser extension disconnected: ${clientAddress} (ID: ${clientId})`);
+        socket.on('close', async (code, reason) => {
+            const connInfo = this.activeConnections.get(clientId);
+            const aliveMs = connInfo ? Date.now() - connInfo.createdAt : 0;
+            const msgCount = connInfo ? connInfo.messageCount : 0;
+            const reasonStr = reason ? reason.toString() : '';
+            Logger.info(`Browser extension disconnected: ${clientAddress} (ID: ${clientId}), code=${code}, reason=${reasonStr}, alive=${aliveMs}ms, messages=${msgCount}`);
+            
             await this.updateClientDisconnected(clientId);
             this.activeConnections.delete(clientId);
             
@@ -960,7 +966,9 @@ class ExtensionWebSocketServer {
         });
 
         socket.on('error', async (error) => {
-            Logger.error(`Browser extension error for ${clientId}: ${error.message}`);
+            const connInfo = this.activeConnections.get(clientId);
+            const aliveMs = connInfo ? Date.now() - connInfo.createdAt : 0;
+            Logger.error(`Browser extension error for ${clientId}: ${error.message}, alive=${aliveMs}ms`);
             await this.updateClientDisconnected(clientId);
             this.activeConnections.delete(clientId);
             
@@ -1699,6 +1707,47 @@ class ExtensionWebSocketServer {
                 Logger.debug(`[Extension] Unwrapped request: action=${action}, requestId=${requestId}`);
             }
             
+            // 支持通知型消息：type: 'notification'（不需要响应，无 requestId）
+            if (data.type === 'notification') {
+                const messageSessionId = data.sessionId || sessionId;
+                
+                // 验证会话（如果启用认证）
+                if (this.isAuthEnabled()) {
+                    const session = this.validateRequestSession(messageSessionId);
+                    if (!session) {
+                        Logger.warn(`[Auth] Invalid session for extension notification from ${clientId}`);
+                        return;
+                    }
+                }
+                
+                // 解包通知消息
+                const action = data.action;
+                const payload = data.payload || {};
+                
+                data = {
+                    type: action,
+                    ...payload
+                };
+                
+                Logger.debug(`[Extension] Unwrapped notification: action=${action}`);
+            }
+            
+            // 处理应用层心跳
+            if (data.type === 'ping') {
+                const connInfo = this.activeConnections.get(clientId);
+                if (connInfo) {
+                    connInfo.lastActivity = Date.now();
+                    const socket = connInfo.socket || connInfo;
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify({
+                            type: 'pong',
+                            timestamp: new Date().toISOString()
+                        }));
+                    }
+                }
+                return;
+            }
+            
             // 验证会话（如果启用认证，针对非 request 格式的消息）
             if (this.isAuthEnabled() && sessionId && data.type !== 'request') {
                 const session = this.validateRequestSession(sessionId);
@@ -1758,13 +1807,40 @@ class ExtensionWebSocketServer {
                     timestamp: new Date().toISOString()
                 });
                 
+                // 发送 init_ack 响应，包含服务端配置信息
+                const connInfo = this.activeConnections.get(clientId);
+                if (connInfo) {
+                    const socket = connInfo.socket || connInfo;
+                    if (socket.readyState === WebSocket.OPEN) {
+                        const serverConfig = {
+                            request: {
+                                defaultTimeout: this.requestTimeout
+                            },
+                            heartbeat: {
+                                interval: this.heartbeatInterval,
+                                timeout: this.heartbeatTimeout
+                            },
+                            rateLimit: this.securityConfig?.rateLimit || null,
+                            resourceMonitor: this.securityConfig?.resourceMonitor || null
+                        };
+                        socket.send(JSON.stringify({
+                            type: 'init_ack',
+                            status: 'ok',
+                            serverConfig: serverConfig,
+                            timestamp: new Date().toISOString()
+                        }));
+                        Logger.info(`Sent init_ack to extension ${clientId}`);
+                    }
+                }
+                
                 return;
             }
 
             // 处理标签页数据更新
             if (data.type === 'data' && this.tabsManager) {
-                const tabs = data.payload?.tabs || [];
-                const active_tab_id = data.payload?.active_tab_id;
+                // 兼容两种格式：notification 解包后 tabs 在顶层，旧格式在 payload 内
+                const tabs = data.tabs || data.payload?.tabs || [];
+                const active_tab_id = data.active_tab_id || data.payload?.active_tab_id;
                 
                 await this.tabsManager.updateTabs(tabs, active_tab_id);
                 
