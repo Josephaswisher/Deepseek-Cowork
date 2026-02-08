@@ -416,7 +416,78 @@ class ExtensionWebSocketServer {
         
         this.heartbeatTimer = setInterval(() => {
             this.checkHeartbeat();
+            this.checkSessionExpiry();
         }, this.heartbeatInterval);
+    }
+
+    /**
+     * 检查并通知即将过期的会话
+     * 在会话过期前 5 分钟发送警告，过期后发送强制重认证通知
+     */
+    checkSessionExpiry() {
+        if (!this.isAuthEnabled() || !this.authManager) {
+            return;
+        }
+        
+        const now = Date.now();
+        const SESSION_EXPIRY_WARNING_MS = 300000;  // 5 分钟前发出警告
+        
+        for (const [clientId, connInfo] of this.activeConnections.entries()) {
+            if (!connInfo.sessionId) continue;
+            
+            const session = this.authManager.getSessionInfo(connInfo.sessionId);
+            const socket = connInfo.socket || connInfo;
+            
+            if (!session) {
+                // 会话已过期或不存在，通知客户端需要重新认证
+                if (socket.readyState === WebSocket.OPEN && !connInfo._sessionExpiredNotified) {
+                    connInfo._sessionExpiredNotified = true;
+                    try {
+                        socket.send(JSON.stringify({
+                            type: 'session_expired',
+                            reason: 'Session expired or invalidated',
+                            action: 'reconnect',
+                            timestamp: new Date().toISOString()
+                        }));
+                        Logger.info(`[Auth] Session expired notification sent to ${clientId}`);
+                    } catch (err) {
+                        Logger.error(`[Auth] Failed to send session_expired to ${clientId}: ${err.message}`);
+                    }
+                    
+                    // 给客户端 5 秒时间处理，然后关闭连接
+                    setTimeout(() => {
+                        try {
+                            if (socket.readyState === WebSocket.OPEN) {
+                                socket.close(4001, 'Session expired');
+                            }
+                        } catch (err) {
+                            // ignore
+                        }
+                    }, 5000);
+                }
+                continue;
+            }
+            
+            // 检查是否即将过期
+            const timeToExpiry = session.expiresAt.getTime() - now;
+            if (timeToExpiry <= SESSION_EXPIRY_WARNING_MS && timeToExpiry > 0 && !connInfo._sessionExpiryWarned) {
+                connInfo._sessionExpiryWarned = true;
+                
+                if (socket.readyState === WebSocket.OPEN) {
+                    try {
+                        socket.send(JSON.stringify({
+                            type: 'session_expiring',
+                            expiresIn: Math.floor(timeToExpiry / 1000),
+                            action: 'reconnect_soon',
+                            timestamp: new Date().toISOString()
+                        }));
+                        Logger.info(`[Auth] Session expiry warning sent to ${clientId} (expires in ${Math.floor(timeToExpiry / 1000)}s)`);
+                    } catch (err) {
+                        Logger.error(`[Auth] Failed to send session_expiring to ${clientId}: ${err.message}`);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -701,31 +772,44 @@ class ExtensionWebSocketServer {
         // 添加 socket 属性用于识别
         socket._authSocketId = socketId;
         
-        // 监听认证响应
-        socket.on('message', async (message) => {
+        // 定义认证阶段的事件处理器（保存引用以便精确移除）
+        const authMessageHandler = async (message) => {
             const pending = this.pendingAuth.get(socketId);
             if (pending) {
                 // 仍在认证阶段
                 await this.handleAuthMessage(socketId, message);
             }
-        });
+        };
         
-        socket.on('close', () => {
+        const authCloseHandler = () => {
             const pending = this.pendingAuth.get(socketId);
             if (pending) {
                 clearTimeout(pending.timeout);
                 this.pendingAuth.delete(socketId);
             }
-        });
+        };
         
-        socket.on('error', (error) => {
+        const authErrorHandler = (error) => {
             Logger.error(`[Auth] Socket error during auth: ${error.message}`);
             const pending = this.pendingAuth.get(socketId);
             if (pending) {
                 clearTimeout(pending.timeout);
                 this.pendingAuth.delete(socketId);
             }
-        });
+        };
+        
+        // 保存处理器引用到 pendingAuth 和 socket 上，以便认证完成后精确移除
+        const pendingEntry = this.pendingAuth.get(socketId);
+        pendingEntry._authHandlers = {
+            message: authMessageHandler,
+            close: authCloseHandler,
+            error: authErrorHandler
+        };
+        
+        // 监听认证响应
+        socket.on('message', authMessageHandler);
+        socket.on('close', authCloseHandler);
+        socket.on('error', authErrorHandler);
         
         // 发送 auth_challenge
         socket.send(JSON.stringify({
@@ -823,12 +907,17 @@ class ExtensionWebSocketServer {
             
             Logger.info(`[Auth] Authentication successful for ${clientType}:${clientId} from ${clientAddress}`);
             
+            // 精确移除认证阶段的事件处理器（而非 removeAllListeners），
+            // 避免破坏 ws 库内部可能的事件处理链
+            const authHandlers = pending._authHandlers;
+            if (authHandlers) {
+                socket.removeListener('message', authHandlers.message);
+                socket.removeListener('close', authHandlers.close);
+                socket.removeListener('error', authHandlers.error);
+            }
+            
             // 清理待认证状态
             this.pendingAuth.delete(socketId);
-            
-            // 移除认证阶段的所有监听器（message, close, error），
-            // handleExtensionClient / handleAutomationClient 会重新注册完整的监听器集
-            socket.removeAllListeners();
             
             // 继续正常的连接处理
             if (clientType === 'automation') {
@@ -903,8 +992,6 @@ class ExtensionWebSocketServer {
         
         Logger.info(`Browser extension connected: ${clientAddress} (ID: ${clientId})${sessionId ? ' [authenticated]' : ''}`);
         
-        await this.storeClient(clientId, clientAddress, 'extension');
-        
         // 存储连接信息（包含元数据）
         const connectionInfo = {
             socket,
@@ -922,6 +1009,9 @@ class ExtensionWebSocketServer {
         // 存储 socket 的 sessionId 关联
         socket._sessionId = sessionId;
         socket._clientId = clientId;
+
+        // 【重要】先注册所有事件处理器，再执行异步操作（如 DB 写入）
+        // 避免认证成功后到处理器注册之间的事件丢失窗口
 
         // 监听 pong 响应（用于心跳检测）
         socket.on('pong', () => {
@@ -949,11 +1039,11 @@ class ExtensionWebSocketServer {
             const reasonStr = reason ? reason.toString() : '';
             Logger.info(`Browser extension disconnected: ${clientAddress} (ID: ${clientId}), code=${code}, reason=${reasonStr}, alive=${aliveMs}ms, messages=${msgCount}`);
             
-            await this.updateClientDisconnected(clientId);
+            // 先同步删除内存中的状态，再执行异步 DB 操作
             this.activeConnections.delete(clientId);
-            
-            // 同步清理 authenticatedSockets 中的关联条目
             this.cleanupAuthenticatedSocket(clientId);
+            
+            await this.updateClientDisconnected(clientId);
             
             // 记录会话结束
             if (sessionId && this.auditLogger) {
@@ -969,12 +1059,16 @@ class ExtensionWebSocketServer {
             const connInfo = this.activeConnections.get(clientId);
             const aliveMs = connInfo ? Date.now() - connInfo.createdAt : 0;
             Logger.error(`Browser extension error for ${clientId}: ${error.message}, alive=${aliveMs}ms`);
-            await this.updateClientDisconnected(clientId);
-            this.activeConnections.delete(clientId);
             
-            // 同步清理 authenticatedSockets 中的关联条目
+            // 先同步删除内存中的状态，再执行异步 DB 操作
+            this.activeConnections.delete(clientId);
             this.cleanupAuthenticatedSocket(clientId);
+            
+            await this.updateClientDisconnected(clientId);
         });
+
+        // 异步操作放在事件处理器注册之后，确保不会丢失事件
+        await this.storeClient(clientId, clientAddress, 'extension');
     }
 
     /**
@@ -989,8 +1083,6 @@ class ExtensionWebSocketServer {
         const now = Date.now();
         
         Logger.info(`Automation client connected: ${clientAddress} (ID: ${clientId})${sessionId ? ' [authenticated]' : ''}`);
-        
-        await this.storeClient(clientId, clientAddress, 'automation_client');
         
         // 存储连接信息（包含元数据）
         const connectionInfo = {
@@ -1010,6 +1102,8 @@ class ExtensionWebSocketServer {
         socket._sessionId = sessionId;
         socket._clientId = clientId;
 
+        // 【重要】先注册所有事件处理器，再执行异步操作
+        
         // 监听 pong 响应（用于心跳检测）
         socket.on('pong', () => {
             const connInfo = this.activeConnections.get(clientId);
@@ -1031,11 +1125,12 @@ class ExtensionWebSocketServer {
 
         socket.on('close', async () => {
             Logger.info(`Automation client disconnected: ${clientAddress} (ID: ${clientId})`);
-            await this.updateClientDisconnected(clientId);
-            this.activeConnections.delete(clientId);
             
-            // 同步清理 authenticatedSockets 中的关联条目
+            // 先同步删除内存中的状态，再执行异步 DB 操作
+            this.activeConnections.delete(clientId);
             this.cleanupAuthenticatedSocket(clientId);
+            
+            await this.updateClientDisconnected(clientId);
             
             // 记录会话结束
             if (sessionId && this.auditLogger) {
@@ -1049,12 +1144,16 @@ class ExtensionWebSocketServer {
 
         socket.on('error', async (error) => {
             Logger.error(`Automation client error for ${clientId}: ${error.message}`);
-            await this.updateClientDisconnected(clientId);
-            this.activeConnections.delete(clientId);
             
-            // 同步清理 authenticatedSockets 中的关联条目
+            // 先同步删除内存中的状态，再执行异步 DB 操作
+            this.activeConnections.delete(clientId);
             this.cleanupAuthenticatedSocket(clientId);
+            
+            await this.updateClientDisconnected(clientId);
         });
+
+        // 异步操作放在事件处理器注册之后
+        await this.storeClient(clientId, clientAddress, 'automation_client');
 
         // 发送欢迎消息
         this.sendToAutomationClient(socket, {
@@ -1688,6 +1787,20 @@ class ExtensionWebSocketServer {
                     const session = this.validateRequestSession(messageSessionId);
                     if (!session) {
                         Logger.warn(`[Auth] Invalid session for extension request from ${clientId}`);
+                        // 发送错误响应通知客户端会话已过期，而不是静默丢弃
+                        const connInfo = this.activeConnections.get(clientId);
+                        if (connInfo) {
+                            const socket = connInfo.socket || connInfo;
+                            if (socket.readyState === WebSocket.OPEN) {
+                                socket.send(JSON.stringify({
+                                    type: 'error',
+                                    code: 'SESSION_EXPIRED',
+                                    message: 'Session expired or invalid. Please reconnect.',
+                                    requestId: data.requestId,
+                                    timestamp: new Date().toISOString()
+                                }));
+                            }
+                        }
                         return;
                     }
                 }
@@ -1716,6 +1829,19 @@ class ExtensionWebSocketServer {
                     const session = this.validateRequestSession(messageSessionId);
                     if (!session) {
                         Logger.warn(`[Auth] Invalid session for extension notification from ${clientId}`);
+                        // 发送会话过期通知
+                        const connInfo = this.activeConnections.get(clientId);
+                        if (connInfo) {
+                            const socket = connInfo.socket || connInfo;
+                            if (socket.readyState === WebSocket.OPEN) {
+                                socket.send(JSON.stringify({
+                                    type: 'session_expired',
+                                    reason: 'Session expired or invalid',
+                                    action: 'reconnect',
+                                    timestamp: new Date().toISOString()
+                                }));
+                            }
+                        }
                         return;
                     }
                 }
@@ -1752,8 +1878,23 @@ class ExtensionWebSocketServer {
             if (this.isAuthEnabled() && sessionId && data.type !== 'request') {
                 const session = this.validateRequestSession(sessionId);
                 if (!session) {
-                    Logger.warn(`[Auth] Invalid session for extension message from ${clientId}`);
-                    // 扩展消息通常是响应，不需要返回错误
+                    Logger.warn(`[Auth] Invalid session for extension message from ${clientId}, type=${data.type}`);
+                    // 对于操作完成类响应（*_complete）仍然处理，避免阻塞请求链路
+                    // 但对于其他消息类型，发送会话过期通知
+                    if (!data.type?.endsWith('_complete') && data.type !== 'data' && data.type !== 'error') {
+                        const connInfo = this.activeConnections.get(clientId);
+                        if (connInfo) {
+                            const socket = connInfo.socket || connInfo;
+                            if (socket.readyState === WebSocket.OPEN) {
+                                socket.send(JSON.stringify({
+                                    type: 'session_expired',
+                                    reason: 'Session expired or invalid',
+                                    action: 'reconnect',
+                                    timestamp: new Date().toISOString()
+                                }));
+                            }
+                        }
+                    }
                 }
             }
 
