@@ -12,7 +12,7 @@ const ThemeManager = {
   THEMES: ['light', 'dark', 'system'],
   
   // 当前主题模式 ('light' | 'dark' | 'system')
-  currentMode: 'system',
+  currentMode: 'dark',
   
   // 实际应用的主题 ('light' | 'dark')
   appliedTheme: 'dark',
@@ -32,7 +32,7 @@ const ThemeManager = {
     if (saved && this.THEMES.includes(saved)) {
       this.currentMode = saved;
     } else {
-      this.currentMode = 'system';
+      this.currentMode = 'dark';
     }
     
     // 应用主题
