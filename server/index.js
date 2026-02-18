@@ -69,13 +69,15 @@ async function main() {
         setupShutdownHandler();
         
         // 8. 启动 HTTP 服务器
-        const PORT = config.server.port || 3333;
-        const HOST = config.server.host || 'localhost';
+        // Use process.env.PORT for cloud platforms (Railway, Render, Heroku, etc.)
+        const PORT = process.env.PORT || config.server.port || 3333;
+        // Bind to 0.0.0.0 so the server is reachable from outside the container
+        const HOST = '0.0.0.0';
         
         httpServer.listen(PORT, HOST, async () => {
             logger.info(`DeepSeek Cowork Server started`);
-            logger.info(`Access URL: ${config.server.baseUrl}`);
-            logger.info(`Socket.IO enabled on ${config.server.baseUrl}/socket.io/`);
+            logger.info(`Listening on ${HOST}:${PORT}`);
+            logger.info(`Socket.IO enabled`);
             
             // 9. 启动所有服务
             await bootstrapServices({ app, io, http: httpServer, config, PORT });
