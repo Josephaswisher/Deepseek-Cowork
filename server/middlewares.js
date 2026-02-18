@@ -46,9 +46,16 @@ function setupMiddlewares(app, config) {
         allowedHeaders: config.cors?.allowedHeaders || ['Content-Type', 'Accept', 'Authorization']
     }));
 
-    // 设置静态文件服务
+    // 设置静态文件服务 - 优先使用配置指定的目录
     if (config.staticDir) {
         app.use(express.static(path.resolve(config.staticDir)));
+    }
+
+    // 服务 renderer 目录中的静态文件（UI 界面）
+    // This serves the web UI from the renderer/ directory at the root URL
+    const rendererPath = path.join(__dirname, '..', 'renderer');
+    if (fs.existsSync(rendererPath)) {
+        app.use(express.static(rendererPath));
     }
 
     // JSON 解析中间件
